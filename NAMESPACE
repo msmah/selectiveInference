@@ -1,0 +1,34 @@
+export(lar,fs,
+       larInf,fsInf,
+       coef.lar,coef.fs,
+       predict.lar,predict.fs,
+       print.lar,print.fs,
+       print.larInf,print.fsInf,
+       plot.lar,plot.fs,
+       fixedLassoInf,print.fixedLassoInf,
+       forwardStop,
+       estimateSigma,
+       manyMeans,print.manyMeans
+    )
+
+S3method("coef", "lar")
+S3method("predict", "lar")
+S3method("print", "lar")
+S3method("plot", "lar")
+S3method("print", "larInf")
+S3method("coef", "fs")
+S3method("predict", "fs")
+S3method("print", "fs")
+S3method("plot", "fs")
+S3method("print", "fsInf")
+S3method("print", "fixedLassoInf")
+S3method("print", "manyMeans")
+
+useDynLib("selectiveInference")
+import(glmnet)
+importFrom("graphics", "abline", "axis", "matplot", "plot")
+importFrom("stats", "dnorm", "lsfit", "pexp", "pnorm", "predict",
+             "qnorm", "rnorm", "sd", "uniroot")
+
+
+
