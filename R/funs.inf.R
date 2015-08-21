@@ -17,8 +17,8 @@ poly.pval <- function(y, G, u, v, sigma) {
 # Main confidence interval function
 
 poly.int <- function(y, G, u, v, sigma, alpha, gridrange=c(-100,100),
-                     gridpts=1000, flip=FALSE) {
-
+                     gridpts=10000, flip=FALSE) {
+  
   z = sum(v*y)
   vv = sum(v^2)
   sd = sigma*sqrt(vv)
@@ -55,8 +55,8 @@ grid.search <- function(grid, vals, left, right) {
   ir = which(vals <= right)
   if (length(il)==0) return(c(grid[n],Inf))   # All vals < left
   if (length(ir)==0) return(c(-Inf,grid[1]))  # All vals > right
-  ## RJT QUESTION: should we just return c(-Inf,Inf) for the
-  ## above two cases?? The above logic seems correct ...
+  # RJT: the above logic is correct ... but for simplicity, instead,
+  # we could just return c(-Inf,Inf) 
 
   i1 = min(il); i2 = max(ir)
   if (i1==1) lo = -Inf
@@ -76,10 +76,33 @@ tnorm.surv <- function(z, mean, sd, a, b) {
   p[mean==-Inf] = 0
   p[mean==Inf] = 1
   
+  # Try the multi precision floating point calculation first
   o = is.finite(mean)
-  p[o] = bryc.tnorm.surv(z,mean[o],sd,a,b)
-  #p[o] = gsell.tnorm.surv(z,mean[o],sd,a,b)
+  mm = mean[o]
+  pp = mpfr.tnorm.surv(z,mm,sd,a,b) 
+
+  # If there are any NAs, then settle for an approximation
+  oo = is.na(pp)
+  if (any(oo)) {
+    pp[oo] = bryc.tnorm.surv(z,mm[oo],sd,a,b)
+    #pp[oo] = gsell.tnorm.surv(z,mm[oo],sd,a,b)
+  }
+  
+  p[o] = pp
   return(p)
+}
+
+# Returns Prob(Z>z | Z in [a,b]), where mean cane be a vector, using
+# multi precision floating point calculations thanks to the Rmpfr package
+
+mpfr.tnorm.surv <- function(z, mean=0, sd=1, a, b, bits=250) {
+  ## z = mpfr((z-mean)/sd, bits)
+  ## a = mpfr((a-mean)/sd, bits)
+  ## b = mpfr((b-mean)/sd, bits)
+  z = (z-mean)/sd
+  a = (a-mean)/sd
+  b = (b-mean)/sd
+  return((pnorm(b)-pnorm(z))/(pnorm(b)-pnorm(a)))
 }
 
 # Returns Prob(Z>z | Z in [a,b]), where mean can be a vector, based on
@@ -172,5 +195,6 @@ aicStop <- function(x, y, action, df, sigma, mult=2, ntimes=2) {
     aic = aic[1:i]
   }
   else khat = k
-  return(list(khat=khat,G=G,u=u,aic=aic))
+  
+  return(list(khat=khat,G=G,u=u,aic=aic,stopped=(i<k)))
 }

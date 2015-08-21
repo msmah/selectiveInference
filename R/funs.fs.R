@@ -27,7 +27,7 @@ fs <- function(x, y, maxsteps=2000, intercept=TRUE, normalize=TRUE,
 
   #####
   # Find the first variable to enter and its sign
-  xx = scale(x,center=F,scale=sqrt(colSums(x^2)))
+  xx = scale(x,center=F,scale=colSums(x^2))
   uhat = t(xx)%*%y
   ihit = which.max(abs(uhat))   # Hitting coordinate
   s = Sign(uhat[ihit])          # Sign
@@ -92,7 +92,7 @@ fs <- function(x, y, maxsteps=2000, intercept=TRUE, normalize=TRUE,
     # Key quantities for the next entry
     a = backsolve(R,t(Q1)%*%y)
     mat = X2 - X1 %*% backsolve(R,t(Q1)%*%X2)
-    xx = scale(mat,center=F,scale=sqrt(colSums(mat^2)))
+    xx = scale(mat,center=F,scale=colSums(mat^2))
     aa = as.numeric(t(xx)%*%y)
     
     # If the inactive set is empty, nothing will hit
@@ -218,8 +218,7 @@ predict.fs <- function(object, newx, s, ...) {
 # FS inference function
 
 fsInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","aic"), 
-                  gridrange=c(-100,100), gridpts=1000, mult=2, ntimes=2,
-                  verbose=FALSE) {
+                  gridrange=c(-100,100), gridpts=10000, mult=2, ntimes=2, verbose=FALSE) {
   
   this.call = match.call()
   type = match.arg(type)
@@ -237,9 +236,13 @@ fsInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","aic
   n = nrow(x)
   G = obj$Gamma
   nk = obj$nk
+  sx = obj$sx
 
   if (is.null(sigma)) {
-    if (n >= 2*p) sigma = sqrt(sum(lsfit(x,y,intercept=F)$res^2)/(n-p))
+    if (n >= 2*p) {
+      oo = obj$intercept
+      sigma = sqrt(sum(lsfit(x,y,intercept=oo)$res^2)/(n-p-oo))
+    }
     else {
       sigma = sd(y)
       warning(paste(sprintf("p > n/2, and sd(y) = %0.3f used as an estimate of sigma;",sigma),
@@ -258,20 +261,22 @@ fsInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","aic
 
     for (j in 1:k) {
       if (verbose) cat(sprintf("Inference for variable %i ...\n",vars[j]))
-      
+
       Gj = G[1:nk[j],]
       uj = rep(0,nk[j])
       vj = G[nk[j],]
-      vj = vj / sqrt(sum(vj^2))
+      mj = sqrt(sum(vj^2)) 
+      vj = vj / mj              # Standardize (divide by norm of vj)
       a = poly.pval(y,Gj,uj,vj,sigma)
       pv[j] = a$pv
-      vlo[j] = a$vlo
-      vup[j] = a$vup
-      vmat[j,] = vj
-    
+      sxj = sx[vars[j]]
+      vlo[j] = a$vlo * mj / sxj # Unstandardize (mult by norm of vj / sxj)
+      vup[j] = a$vup * mj / sxj # Unstandardize (mult by norm of vj / sxj)
+      vmat[j,] = vj * mj / sxj  # Unstandardize (mult by norm of vj / sxj)
+  
       a = poly.int(y,Gj,uj,vj,sigma,alpha,gridrange=gridrange,
         gridpts=gridpts,flip=(sign[j]==-1))
-      ci[j,] = a$int
+      ci[j,] = a$int * mj / sxj # Unstandardize (mult by norm of vj / sxj)
       tailarea[j,] = a$tailarea
     }
 
@@ -282,13 +287,14 @@ fsInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","aic
     if (type == "aic") {
       out = aicStop(x,y,obj$action[1:k],obj$df[1:k],sigma,mult,ntimes)
       khat = out$khat
-      GG = out$G
-      uu = out$u
+      m = out$stopped * ntimes
+      G = rbind(out$G,G[1:nk[khat+m],])  # Take ntimes more steps past khat
+      u = c(out$u,rep(0,nk[khat+m]))     # (if we need to)
       kk = khat
     }
     else {
-      GG = matrix(0,0,n)
-      uu = c()
+      G = G[1:nk[k],]
+      u = rep(0,nk[k])
       kk = k
     }
     
@@ -297,31 +303,30 @@ fsInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","aic
     ci = tailarea = matrix(0,kk,2)
     sign = numeric(kk)
     vars = obj$action[1:kk]
-
-    G = rbind(GG,G[1:nk[kk],])
-    u = c(uu,rep(0,nk[kk]))
     xa = x[,vars]
-    M = solve(crossprod(xa),t(xa))
+    M = pinv(crossprod(xa)) %*% t(xa)
     
     for (j in 1:kk) {
       if (verbose) cat(sprintf("Inference for variable %i ...\n",vars[j]))
-            
+
       vj = M[j,]
+      mj = sqrt(sum(vj^2))
+      vj = vj / mj              # Standardize (divide by norm of vj)
       sign[j] = sign(sum(vj*y))
-      vj = vj / sqrt(sum(vj^2))
       vj = sign[j] * vj
       Gj = rbind(G,vj)
       uj = c(u,0)
 
       a = poly.pval(y,Gj,uj,vj,sigma)
       pv[j] = a$pv
-      vlo[j] = a$vlo
-      vup[j] = a$vup
-      vmat[j,] = vj
+      sxj = sx[vars[j]]
+      vlo[j] = a$vlo * mj / sxj # Unstandardize (mult by norm of vj / sxj)
+      vup[j] = a$vup * mj / sxj # Unstandardize (mult by norm of vj / sxj)
+      vmat[j,] = vj * mj / sxj  # Unstandardize (mult by norm of vj / sxj)
 
       a = poly.int(y,Gj,uj,vj,sigma,alpha,gridrange=gridrange,
         gridpts=gridpts,flip=(sign[j]==-1))
-      ci[j,] = a$int
+      ci[j,] = a$int * mj / sxj # Unstandardize (mult by norm of vj / sxj)
       tailarea[j,] = a$tailarea
     }
   }
@@ -362,9 +367,10 @@ print.fsInf <- function(x, tailarea=TRUE, ...) {
   if (x$type == "active") {
     cat(sprintf("\nSequential testing results with alpha = %0.3f\n",x$alpha))
     tab = cbind(1:length(x$pv),x$vars,
-      round(x$sign*x$vmat%*%x$y,3),round(x$sign*x$vmat%*%x$y/x$sigma,3),
+      round(x$sign*x$vmat%*%x$y,3),
+      round(x$sign*x$vmat%*%x$y/(x$sigma*sqrt(rowSums(x$vmat^2))),3),
       round(x$pv,3),round(x$ci,3))
-    colnames(tab) = c("Step", "Var", "StdzCoef", "Z-score", "P-value",
+    colnames(tab) = c("Step", "Var", "Coef", "Z-score", "P-value",
               "LowConfPt", "UpConfPt")
     if (tailarea) {
       tab = cbind(tab,round(x$tailarea,3))
@@ -379,9 +385,10 @@ print.fsInf <- function(x, tailarea=TRUE, ...) {
   else if (x$type == "all") {
     cat(sprintf("\nTesting results at step = %i, with alpha = %0.3f\n",x$k,x$alpha))
     tab = cbind(x$vars,
-      round(x$sign*x$vmat%*%x$y,3),round(x$sign*x$vmat%*%x$y/x$sigma,3),
+      round(x$sign*x$vmat%*%x$y,3),
+      round(x$sign*x$vmat%*%x$y/(x$sigma*sqrt(rowSums(x$vmat^2))),3),
       round(x$pv,3),round(x$ci,3))
-    colnames(tab) = c("Var", "StdzCoef", "Z-score", "P-value", "LowConfPt", "UpConfPt")
+    colnames(tab) = c("Var", "Coef", "Z-score", "P-value", "LowConfPt", "UpConfPt")
     if (tailarea) {
       tab = cbind(tab,round(x$tailarea,3))
       colnames(tab)[(ncol(tab)-1):ncol(tab)] = c("LowTailArea","UpTailArea")
@@ -393,9 +400,10 @@ print.fsInf <- function(x, tailarea=TRUE, ...) {
   else if (x$type == "aic") {
     cat(sprintf("\nTesting results at step = %i, with alpha = %0.3f\n",x$khat,x$alpha))
     tab = cbind(x$vars,
-      round(x$sign*x$vmat%*%x$y,3),round(x$sign*x$vmat%*%x$y/x$sigma,3),
+      round(x$sign*x$vmat%*%x$y,3),
+      round(x$sign*x$vmat%*%x$y/(x$sigma*sqrt(rowSums(x$vmat^2))),3),
       round(x$pv,3),round(x$ci,3))
-    colnames(tab) = c("Var", "StdzCoef", "Z-score", "P-value", "LowConfPt", "UpConfPt")
+    colnames(tab) = c("Var", "Coef", "Z-score", "P-value", "LowConfPt", "UpConfPt")
     if (tailarea) {
       tab = cbind(tab,round(x$tailarea,3))
       colnames(tab)[(ncol(tab)-1):ncol(tab)] = c("LowTailArea","UpTailArea")

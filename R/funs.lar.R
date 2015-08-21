@@ -61,11 +61,11 @@ lar <- function(x, y, maxsteps=2000, minlam=0, intercept=TRUE, normalize=TRUE,
   Gamma = matrix(0,gbuf,n)
   Gamma[gi+Seq(1,p-1),] = t(s*x[,ihit]+x[,-ihit]); gi = gi+p-1
   Gamma[gi+Seq(1,p-1),] = t(s*x[,ihit]-x[,-ihit]); gi = gi+p-1
-  Gamma[gi+1,] = t(s*x[,ihit]); gi = gi+1
+  Gamma[gi+1,] = t(s*x[,ihit]) / sum(x[,ihit]^2); gi = gi+1
   nk = gi
 
   # M plus
-  if (p>1) {
+  if (p > 1) {
     c = t(as.numeric(Sign(t(x)%*%y)) * t(x))
     ratio = t(c[,-ihit])%*%c[,ihit]/sum(c[,ihit]^2)
     ip = 1-ratio > 0
@@ -145,11 +145,11 @@ lar <- function(x, y, maxsteps=2000, minlam=0, intercept=TRUE, normalize=TRUE,
     c = t(t(X2perp)/(shits-bb))
     Gamma[gi+Seq(1,p-r),] = shits*t(X2perp); gi = gi+p-r
     Gamma[gi+Seq(1,p-r-1),] = t(c[,ihit]-c[,-ihit]); gi = gi+p-r-1
-    Gamma[gi+1,] = t(c[,ihit]); gi = gi+1
+    Gamma[gi+1,] = t(shit*X2perp[,ihit]) / sum(X2perp[,ihit]^2); gi = gi+1
     nk = c(nk,gi)
     
     # M plus
-    if (ncol(c)>1) {
+    if (ncol(c) > 1) {
       ratio = t(c[,-ihit])%*%c[,ihit]/sum(c[,ihit]^2)
       ip = 1-ratio > 0
       crit = (t(c[,-ihit])%*%y - ratio*sum(c[,ihit]*y))/(1-ratio)
@@ -342,7 +342,7 @@ predict.lasso <- predict.lar
 # Lar inference function
 
 larInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","aic"), 
-                   gridrange=c(-100,100), gridpts=1000, mult=2, ntimes=2, verbose=FALSE) {
+                   gridrange=c(-100,100), gridpts=10000, mult=2, ntimes=2, verbose=FALSE) {
   
   this.call = match.call()
   type = match.arg(type)
@@ -360,9 +360,13 @@ larInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","ai
   n = nrow(x)
   G = obj$Gamma
   nk = obj$nk
+  sx = obj$sx
 
   if (is.null(sigma)) {
-    if (n >= 2*p) sigma = sqrt(sum(lsfit(x,y,intercept=F)$res^2)/(n-p))
+    if (n >= 2*p) {
+      oo = obj$intercept
+      sigma = sqrt(sum(lsfit(x,y,intercept=oo)$res^2)/(n-p-oo))
+    }
     else {
       sigma = sd(y)
       warning(paste(sprintf("p > n/2, and sd(y) = %0.3f used as an estimate of sigma;",sigma),
@@ -386,16 +390,18 @@ larInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","ai
       Gj = G[1:nk[j],]
       uj = rep(0,nk[j])
       vj = G[nk[j],]
-      vj = vj / sqrt(sum(vj^2))
+      mj = sqrt(sum(vj^2))
+      vj = vj / mj              # Standardize (divide by norm of vj)
       a = poly.pval(y,Gj,uj,vj,sigma)
       pv[j] = a$pv
-      vlo[j] = a$vlo
-      vup[j] = a$vup
-      vmat[j,] = vj
+      sxj = sx[vars[j]]
+      vlo[j] = a$vlo * mj / sxj # Unstandardize (mult by norm of vj / sxj)
+      vup[j] = a$vup * mj / sxj # Unstandardize (mult by norm of vj)
+      vmat[j,] = vj * mj / sxj  # Unstandardize (mult by norm of vj / sxj)
     
       a = poly.int(y,Gj,uj,vj,sigma,alpha,gridrange=gridrange,
         gridpts=gridpts,flip=(sign[j]==-1))
-      ci[j,] = a$int
+      ci[j,] = a$int * mj / sxj # Unstandardize (mult by norm of vj / sxj) 
       tailarea[j,] = a$tailarea
       
       pv.spacing[j] = spacing.pval(obj,sigma,j)
@@ -410,13 +416,14 @@ larInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","ai
     if (type == "aic") {
       out = aicStop(x,y,obj$action[1:k],obj$df[1:k],sigma,mult,ntimes)
       khat = out$khat
-      GG = out$G
-      uu = out$u
+      m = out$stopped * ntimes
+      G = rbind(out$G,G[1:nk[khat+m],])  # Take ntimes more steps past khat
+      u = c(out$u,rep(0,nk[khat+m]))     # (if we need to)
       kk = khat
     }
     else {
-      GG = matrix(0,0,n)
-      uu = c()
+      G = G[1:nk[k],]
+      u = rep(0,nk[k])
       kk = k
     }
     
@@ -425,31 +432,30 @@ larInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","ai
     ci = tailarea = matrix(0,kk,2)
     sign = numeric(kk)
     vars = obj$action[1:kk]
-
-    G = rbind(GG,G[1:nk[kk],])
-    u = c(uu,rep(0,nk[kk]))
     xa = x[,vars]
-    M = solve(crossprod(xa),t(xa))
+    M = pinv(crossprod(xa)) %*% t(xa)
     
     for (j in 1:kk) {
       if (verbose) cat(sprintf("Inference for variable %i ...\n",vars[j]))
       
       vj = M[j,]
-      sign[j] = sign(sum(vj*y))
-      vj = vj / sqrt(sum(vj^2))
+      mj = sqrt(sum(vj^2))
+      vj = vj / mj             # Standardize (divide by norm of vj)
+      sign[j] = sign(sum(vj*y)) 
       vj = sign[j] * vj
       Gj = rbind(G,vj)
       uj = c(u,0)
 
       a = poly.pval(y,Gj,uj,vj,sigma)
       pv[j] = a$pv
-      vlo[j] = a$vlo
-      vup[j] = a$vup
-      vmat[j,] = vj
+      sxj = sx[vars[j]]
+      vlo[j] = a$vlo * mj / sxj # Unstandardize (mult by norm of vj / sxj)
+      vup[j] = a$vup * mj / sxj # Unstandardize (mult by norm of vj / sxj)
+      vmat[j,] = vj * mj / sxj  # Unstandardize (mult by norm of vj / sxj)
 
       a = poly.int(y,Gj,uj,vj,sigma,alpha,gridrange=gridrange,
         gridpts=gridpts,flip=(sign[j]==-1))
-      ci[j,] = a$int
+      ci[j,] = a$int * mj / sxj # Unstandardize (mult by norm of vj / sxj)
       tailarea[j,] = a$tailarea
     }
   }
@@ -543,9 +549,10 @@ print.larInf <- function(x, tailarea=TRUE, ...) {
     cat(sprintf("\nSequential testing results with alpha = %0.3f\n",x$alpha))
     cat("",fill=T)
     tab = cbind(1:length(x$pv),x$vars,
-      round(x$sign*x$vmat%*%x$y,3),round(x$sign*x$vmat%*%x$y/x$sigma,3),
+      round(x$sign*x$vmat%*%x$y,3),
+      round(x$sign*x$vmat%*%x$y/(x$sigma*sqrt(rowSums(x$vmat^2))),3),
       round(x$pv,3),round(x$ci,3),round(x$pv.spacing,3),round(x$pv.cov,3)) 
-    colnames(tab) = c("Step", "Var", "StdzCoef", "Z-score", "P-value",
+    colnames(tab) = c("Step", "Var", "Coef", "Z-score", "P-value",
               "LowConfPt", "UpConfPt", "Spacing-pval", "CovTest-pval")
     if (tailarea) {
       tab = cbind(tab,round(x$tailarea,3))
@@ -561,9 +568,10 @@ print.larInf <- function(x, tailarea=TRUE, ...) {
     cat(sprintf("\nTesting results at step = %i, with alpha = %0.3f\n",x$k,x$alpha))
     cat("",fill=T)
     tab = cbind(x$vars,
-      round(x$sign*x$vmat%*%x$y,3),round(x$sign*x$vmat%*%x$y/x$sigma,3),
+      round(x$sign*x$vmat%*%x$y,3),
+      round(x$sign*x$vmat%*%x$y/(x$sigma*sqrt(rowSums(x$vmat^2))),3),
       round(x$pv,3),round(x$ci,3))
-    colnames(tab) = c("Var", "StdzCoef", "Z-score", "P-value", "LowConfPt", "UpConfPt")
+    colnames(tab) = c("Var", "Coef", "Z-score", "P-value", "LowConfPt", "UpConfPt")
     if (tailarea) {
       tab = cbind(tab,round(x$tailarea,3))
       colnames(tab)[(ncol(tab)-1):ncol(tab)] = c("LowTailArea","UpTailArea")
@@ -576,9 +584,10 @@ print.larInf <- function(x, tailarea=TRUE, ...) {
     cat(sprintf("\nTesting results at step = %i, with alpha = %0.3f\n",x$khat,x$alpha))
      cat("",fill=T)
     tab = cbind(x$vars,
-      round(x$sign*x$vmat%*%x$y,3),round(x$sign*x$vmat%*%x$y/x$sigma,3),
+      round(x$sign*x$vmat%*%x$y,3),
+      round(x$sign*x$vmat%*%x$y/(x$sigma*sqrt(rowSums(x$vmat^2))),3),
       round(x$pv,3),round(x$ci,3))
-    colnames(tab) = c("Var", "StdzCoef", "Z-score", "P-value", "LowConfPt", "UpConfPt")
+    colnames(tab) = c("Var", "Coef", "Z-score", "P-value", "LowConfPt", "UpConfPt")
     if (tailarea) {
       tab = cbind(tab,round(x$tailarea,3))
       colnames(tab)[(ncol(tab)-1):ncol(tab)] = c("LowTailArea","UpTailArea")

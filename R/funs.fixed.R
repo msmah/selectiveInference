@@ -4,7 +4,7 @@
 
 fixedLassoInf <- function(x, y, beta, lambda, intercept=TRUE, sigma=NULL, alpha=0.1,
                      type=c("partial","full"), tol.beta=1e-5, tol.kkt=0.1,
-                     gridrange=c(-100,100), gridpts=1000, verbose=FALSE) {
+                     gridrange=c(-100,100), gridpts=10000, verbose=FALSE) {
   
   this.call = match.call()
   type = match.arg(type)
@@ -18,24 +18,25 @@ fixedLassoInf <- function(x, y, beta, lambda, intercept=TRUE, sigma=NULL, alpha=
   p = ncol(x)
   beta = as.numeric(beta)
   if (length(beta) != p) stop("beta must have length equal to ncol(x)")
-  
+
   # If glmnet was run with an intercept term, center x and y
   if (intercept==TRUE) {
     obj = standardize(x,y,TRUE,FALSE)
     x = obj$x
     y = obj$y
   }
-  
+
   # Check the KKT conditions
   g = t(x)%*%(y-x%*%beta) / lambda
-  if (any(abs(g) > 1+tol.kkt))
+  if (any(abs(g) > 1+tol.kkt*sd(y)))
     warning(paste("Solution beta does not satisfy the KKT conditions",
                   "(to within specified tolerances)"))
   vars = which(abs(beta) > tol.beta)
   if (any(sign(g[vars]) != sign(beta[vars])))
     warning(paste("Solution beta does not satisfy the KKT conditions",
-                  "(to within specified tolerances). You might try rerunning glmnet with a lower setting of the",
-               "'thresh' parameter, for a more accurate convergence."))
+                  "(to within specified tolerances). You might try rerunning",
+                  "glmnet with a lower setting of the",
+                  "'thresh' parameter, for a more accurate convergence."))
   
   # Get lasso polyhedral region, of form Gy >= u
   out = fixedLasso.poly(x,y,beta,lambda,tol.beta)
@@ -54,7 +55,10 @@ fixedLassoInf <- function(x, y, beta, lambda, intercept=TRUE, sigma=NULL, alpha=
 
   # Estimate sigma
   if (is.null(sigma)) {
-    if (n >= 2*p) sigma = sqrt(sum(lsfit(x,y,intercept=F)$res^2)/(n-p))
+    if (n >= 2*p) {
+      oo = intercept
+      sigma = sqrt(sum(lsfit(x,y,intercept=oo)$res^2)/(n-p-oo))
+    }
     else {
       sigma = sd(y)
       warning(paste(sprintf("p > n/2, and sd(y) = %0.3f used as an estimate of sigma;",sigma),
@@ -67,33 +71,35 @@ fixedLassoInf <- function(x, y, beta, lambda, intercept=TRUE, sigma=NULL, alpha=
   vmat = matrix(0,k,n)
   ci = tailarea = matrix(0,k,2)
   sign = numeric(k)
-  
-  if (type=="partial") {
+
+  if (type=="partial" || p > n) {
+    if (p > n) warning(paste("type='full' does not make sense when p > n;",
+                             "switching to type='partial'"))
     xa = x[,vars,drop=F]
     M = pinv(crossprod(xa)) %*% t(xa)
   }
   else {
     M = pinv(crossprod(x)) %*% t(x)
-    M = M[vars,,drop=FALSE]
+    M = M[vars,,drop=F]
   }
   
   for (j in 1:k) {
     if (verbose) cat(sprintf("Inference for variable %i ...\n",vars[j]))
     
     vj = M[j,]
+    mj = sqrt(sum(vj^2))
+    vj = vj / mj        # Standardize (divide by norm of vj)
     sign[j] = sign(sum(vj*y))
-    vj = vj / sqrt(sum(vj^2))
     vj = sign[j] * vj
-
     a = poly.pval(y,G,u,vj,sigma)
-    pv[j] = a$pv
-    vlo[j] = a$vlo
-    vup[j] = a$vup
-    vmat[j,] = vj
+    pv[j] = a$pv * mj   # Unstandardize (mult by norm of vj)
+    vlo[j] = a$vlo * mj # Unstandardize (mult by norm of vj)
+    vup[j] = a$vup * mj # Unstandardize (mult by norm of vj)
+    vmat[j,] = vj * mj  # Unstandardize (mult by norm of vj)
 
     a = poly.int(y,G,u,vj,sigma,alpha,gridrange=gridrange,
       gridpts=gridpts,flip=(sign[j]==-1))
-    ci[j,] = a$int
+    ci[j,] = a$int * mj # Unstandardize (mult by norm of vj)
     tailarea[j,] = a$tailarea
   }
   
@@ -151,9 +157,10 @@ print.fixedLassoInf <- function(x, tailarea=TRUE, ...) {
   cat(sprintf("\nTesting results at lambda = %0.3f, with alpha = %0.3f\n",x$lambda,x$alpha))
   cat("",fill=T)
   tab = cbind(x$vars,
-    round(x$sign*x$vmat%*%x$y,3),round(x$sign*x$vmat%*%x$y/x$sigma,3),
+    round(x$sign*x$vmat%*%x$y,3),
+    round(x$sign*x$vmat%*%x$y/(x$sigma*sqrt(rowSums(x$vmat^2))),3),
     round(x$pv,3),round(x$ci,3))
-  colnames(tab) = c("Var", "StdzCoef", "Z-score", "P-value", "LowConfPt", "UpConfPt")
+  colnames(tab) = c("Var", "Coef", "Z-score", "P-value", "LowConfPt", "UpConfPt")
   if (tailarea) {
     tab = cbind(tab,round(x$tailarea,3))
     colnames(tab)[(ncol(tab)-1):ncol(tab)] = c("LowTailArea","UpTailArea")
