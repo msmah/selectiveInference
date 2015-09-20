@@ -11,7 +11,7 @@ fixed value of the tuning parameter lambda
 \usage{
 fixedLassoInf(x, y, beta, lambda, intercept=TRUE, sigma=NULL, alpha=0.1,
          type=c("partial","full"), tol.beta=1e-5, tol.kkt=0.1,
-         gridrange=c(-100,100), gridpts=10000, verbose=FALSE) 
+         gridrange=c(-100,100), bits=NULL, verbose=FALSE) 
 }
 \arguments{
   \item{x}{
@@ -64,9 +64,17 @@ Tolerance for determining if an entry of the subgradient is zero
 \item{gridrange}{
 Grid range for constructing confidence intervals, on the standardized scale
 }
-\item{gridpts}{
-Number of grid points for constructing confidence intervals, within the specified
-grid range}
+\item{bits}{
+Number of bits to be used for p-value and confidence interval calculations. Default is 
+NULL, in which case standard floating point calculations are performed. When not NULL, 
+multiple precision floating point calculations are performed with the specified number 
+of bits, using the R package \code{Rmpfr}. (If this package is not installed, then the
+argument \code{bits} is silently ignored.) Note: standard double precision uses 53 bits
+so, e.g., a choice of 200 bits uses about 4 times double precision. The confidence
+interval computation is sometimes numerically challenging, and the extra precision can be 
+helpful (though computationally more costly). In particular, extra precision might be tried 
+if the values in the output columns of \code{tailarea} differ noticeably from alpha/2.
+}
 \item{verbose}{
 Print out progress along the way? Default is FALSE}
 }
@@ -82,7 +90,7 @@ gives the achieved Gaussian tail areas for the reported intervals---these should
 to alpha/2, and can be used for error-checking purposes.
 }
 \value{  
-\item{type}{Type of coefficients tested (partial or fall)}
+\item{type}{Type of coefficients tested (partial or full)}
 \item{lambda}{Value of tuning parameter lambda used}
 \item{pv}{P-values for active variables}
 \item{ci}{Confidence intervals}
@@ -99,7 +107,7 @@ to alpha/2, and can be used for error-checking purposes.
 }
 
 \references{
-Jason Lee, Dennis Sun, Yuekai Sun, Jonathan Taylor (2014). 
+Jason Lee, Dennis Sun, Yuekai Sun, Jonathan Taylor (2013). 
 Exact post-selection inference, with application to the lasso. arXiv:1311.6238.
 }
 \author{Ryan Tibshirani, Rob Tibshirani, Jonathan Taylor, Stephen Reid}

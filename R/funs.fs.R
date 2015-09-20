@@ -2,10 +2,11 @@
 # a response vector y and predictor matrix x.  We assume
 # that x has columns in general position.
 
-fs <- function(x, y, maxsteps=2000, intercept=TRUE, normalize=TRUE,
+fs <- function(x, y, maxsteps=2000, mode=c("cor","rss"), intercept=TRUE, normalize=TRUE,
                verbose=FALSE) {
 
   this.call = match.call()
+  mode = match.arg(mode)
   checkargs.xy(x=x,y=y)
   
   # Center and scale, etc.
@@ -27,7 +28,9 @@ fs <- function(x, y, maxsteps=2000, intercept=TRUE, normalize=TRUE,
 
   #####
   # Find the first variable to enter and its sign
-  xx = scale(x,center=F,scale=colSums(x^2))
+  sc = colSums(x^2)
+  if (mode=="cor") sc = sqrt(sc)
+  xx = scale(x,center=F,scale=sc)
   uhat = t(xx)%*%y
   ihit = which.max(abs(uhat))   # Hitting coordinate
   s = Sign(uhat[ihit])          # Sign
@@ -55,7 +58,12 @@ fs <- function(x, y, maxsteps=2000, intercept=TRUE, normalize=TRUE,
   Gamma[gi+Seq(1,p-1),] = t(s*xx[,ihit]+xx[,-ihit]); gi = gi+p-1
   Gamma[gi+Seq(1,p-1),] = t(s*xx[,ihit]-xx[,-ihit]); gi = gi+p-1
   Gamma[gi+1,] = t(s*xx[,ihit]); gi = gi+1
-  nk = gi
+
+  # nk
+  nk = numeric(buf)
+  vreg = matrix(0,buf,n)
+  nk[1] = gi
+  vreg[1,] = s*x[,ihit]/sum(x[,ihit]^2)
 
   # Other things to keep track of, but not return
   r = 1                      # Size of active set
@@ -87,12 +95,16 @@ fs <- function(x, y, maxsteps=2000, intercept=TRUE, normalize=TRUE,
       action = c(action,numeric(buf))
       df = c(df,numeric(buf))
       beta = cbind(beta,matrix(0,p,buf))
+      nk = c(nk,numeric(buf))
+      vreg = rbind(vreg,matrix(0,buf,n))
     }
 
     # Key quantities for the next entry
     a = backsolve(R,t(Q1)%*%y)
     mat = X2 - X1 %*% backsolve(R,t(Q1)%*%X2)
-    xx = scale(mat,center=F,scale=colSums(mat^2))
+    sc = colSums(mat^2)
+    if (mode=="cor") sc = sqrt(sc)
+    xx = scale(mat,center=F,scale=sc)
     aa = as.numeric(t(xx)%*%y)
     
     # If the inactive set is empty, nothing will hit
@@ -117,7 +129,10 @@ fs <- function(x, y, maxsteps=2000, intercept=TRUE, normalize=TRUE,
     Gamma[gi+Seq(1,p-r),] = t(xx); gi = gi+p-r
     Gamma[gi+Seq(1,p-r-1),] = t(xx[,ihit]-xx[,-ihit]); gi = gi+p-r-1
     Gamma[gi+1,] = t(xx[,ihit]); gi = gi+1
-    nk = c(nk,gi)
+
+    # nk, regression contrast
+    nk[k] = gi
+    vreg[k,] = shit*mat[,ihit]/sum(mat[,ihit]^2)
 
     # Update all of the variables
     r = r+1
@@ -146,6 +161,8 @@ fs <- function(x, y, maxsteps=2000, intercept=TRUE, normalize=TRUE,
   df = df[Seq(1,k-1),drop=FALSE]
   beta = beta[,Seq(1,k-1),drop=FALSE]
   Gamma = Gamma[Seq(1,gi),,drop=FALSE]
+  nk = nk[Seq(1,k-1)]
+  vreg = vreg[Seq(1,k-1),,drop=FALSE]
   
   # If we reached the maximum number of steps
   if (k>maxsteps) {
@@ -179,7 +196,7 @@ fs <- function(x, y, maxsteps=2000, intercept=TRUE, normalize=TRUE,
 
   out = list(action=action,sign=s,df=df,beta=beta,
     completepath=completepath,bls=bls,
-    Gamma=Gamma,nk=nk,x=x,y=y,bx=bx,by=by,sx=sx,
+    Gamma=Gamma,nk=nk,vreg=vreg,x=x,y=y,bx=bx,by=by,sx=sx,
     intercept=intercept,normalize=normalize,call=this.call) 
   class(out) = "fs"
   return(out)
@@ -218,13 +235,12 @@ predict.fs <- function(object, newx, s, ...) {
 # FS inference function
 
 fsInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","aic"), 
-                  gridrange=c(-100,100), gridpts=10000, mult=2, ntimes=2, verbose=FALSE) {
+                  gridrange=c(-100,100), bits=NULL, mult=2, ntimes=2, verbose=FALSE) {
   
   this.call = match.call()
   type = match.arg(type)
   checkargs.misc(sigma=sigma,alpha=alpha,k=k,
-                 gridrange=gridrange,gridpts=gridpts,
-                 mult=mult,ntimes=ntimes)
+                 gridrange=gridrange,mult=mult,ntimes=ntimes)
   if (class(obj) != "fs") stop("obj must be an object of class fs")
   if (is.null(k) && type=="active") k = length(obj$action)
   if (is.null(k) && type=="all") stop("k must be specified when type = all")
@@ -256,6 +272,7 @@ fsInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","aic
     pv = vlo = vup = numeric(k) 
     vmat = matrix(0,k,n)
     ci = tailarea = matrix(0,k,2)
+    vreg = obj$vreg[1:k,]
     sign = obj$sign[1:k]
     vars = obj$action[1:k]
 
@@ -264,10 +281,10 @@ fsInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","aic
 
       Gj = G[1:nk[j],]
       uj = rep(0,nk[j])
-      vj = G[nk[j],]
+      vj = vreg[j,]
       mj = sqrt(sum(vj^2)) 
       vj = vj / mj              # Standardize (divide by norm of vj)
-      a = poly.pval(y,Gj,uj,vj,sigma)
+      a = poly.pval(y,Gj,uj,vj,sigma,bits)
       pv[j] = a$pv
       sxj = sx[vars[j]]
       vlo[j] = a$vlo * mj / sxj # Unstandardize (mult by norm of vj / sxj)
@@ -275,7 +292,7 @@ fsInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","aic
       vmat[j,] = vj * mj / sxj  # Unstandardize (mult by norm of vj / sxj)
   
       a = poly.int(y,Gj,uj,vj,sigma,alpha,gridrange=gridrange,
-        gridpts=gridpts,flip=(sign[j]==-1))
+        flip=(sign[j]==-1),bits=bits)
       ci[j,] = a$int * mj / sxj # Unstandardize (mult by norm of vj / sxj)
       tailarea[j,] = a$tailarea
     }
@@ -317,7 +334,7 @@ fsInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","aic
       Gj = rbind(G,vj)
       uj = c(u,0)
 
-      a = poly.pval(y,Gj,uj,vj,sigma)
+      a = poly.pval(y,Gj,uj,vj,sigma,bits)
       pv[j] = a$pv
       sxj = sx[vars[j]]
       vlo[j] = a$vlo * mj / sxj # Unstandardize (mult by norm of vj / sxj)
@@ -325,7 +342,7 @@ fsInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","aic
       vmat[j,] = vj * mj / sxj  # Unstandardize (mult by norm of vj / sxj)
 
       a = poly.int(y,Gj,uj,vj,sigma,alpha,gridrange=gridrange,
-        gridpts=gridpts,flip=(sign[j]==-1))
+        flip=(sign[j]==-1),bits=bits)
       ci[j,] = a$int * mj / sxj # Unstandardize (mult by norm of vj / sxj)
       tailarea[j,] = a$tailarea
     }

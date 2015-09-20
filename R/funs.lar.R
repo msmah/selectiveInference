@@ -62,18 +62,21 @@ lar <- function(x, y, maxsteps=2000, minlam=0, intercept=TRUE, normalize=TRUE,
   Gamma[gi+Seq(1,p-1),] = t(s*x[,ihit]+x[,-ihit]); gi = gi+p-1
   Gamma[gi+Seq(1,p-1),] = t(s*x[,ihit]-x[,-ihit]); gi = gi+p-1
   Gamma[gi+1,] = t(s*x[,ihit]) / sum(x[,ihit]^2); gi = gi+1
-  nk = gi
 
-  # M plus
+  # nk, lambda contrast, M plus
+  nk = mp = numeric(buf)
+  vlam = matrix(0,buf,n)
+
+  nk[1] = gi
+  vlam[1,] = s*x[,ihit]
   if (p > 1) {
     c = t(as.numeric(Sign(t(x)%*%y)) * t(x))
     ratio = t(c[,-ihit])%*%c[,ihit]/sum(c[,ihit]^2)
     ip = 1-ratio > 0
     crit = (t(c[,-ihit])%*%y - ratio*sum(c[,ihit]*y))/(1-ratio)
-    mp = max(max(crit[ip]),0)
+    mp[1] = max(max(crit[ip]),0)
   }
-  else mp = 0
-  
+
   # Other things to keep track of, but not return
   r = 1                      # Size of active set
   A = ihit                   # Active set
@@ -105,6 +108,9 @@ lar <- function(x, y, maxsteps=2000, minlam=0, intercept=TRUE, normalize=TRUE,
       action = c(action,numeric(buf))
       df = c(df,numeric(buf))
       beta = cbind(beta,matrix(0,p,buf))
+      nk = c(nk,numeric(buf))
+      mp = c(mp,numeric(buf))
+      vlam = rbind(vlam,matrix(0,buf,n))
     }
 
     # Key quantities for the hitting times
@@ -146,16 +152,16 @@ lar <- function(x, y, maxsteps=2000, minlam=0, intercept=TRUE, normalize=TRUE,
     Gamma[gi+Seq(1,p-r),] = shits*t(X2perp); gi = gi+p-r
     Gamma[gi+Seq(1,p-r-1),] = t(c[,ihit]-c[,-ihit]); gi = gi+p-r-1
     Gamma[gi+1,] = t(shit*X2perp[,ihit]) / sum(X2perp[,ihit]^2); gi = gi+1
-    nk = c(nk,gi)
-    
-    # M plus
+
+    # nk, lambda contrast, M plus
+    nk[k] = gi
+    vlam[k,] = c[,ihit]
     if (ncol(c) > 1) {
       ratio = t(c[,-ihit])%*%c[,ihit]/sum(c[,ihit]^2)
       ip = 1-ratio > 0
       crit = (t(c[,-ihit])%*%y - ratio*sum(c[,ihit]*y))/(1-ratio)
-      mp = c(mp,max(max(crit[ip]),0))
+      mp[k] = max(max(crit[ip]),0)
     }
-    else mp = c(mp,0)
     
     # Update all of the variables
     r = r+1
@@ -186,6 +192,9 @@ lar <- function(x, y, maxsteps=2000, minlam=0, intercept=TRUE, normalize=TRUE,
   df = df[Seq(1,k-1),drop=FALSE]
   beta = beta[,Seq(1,k-1),drop=FALSE]
   Gamma = Gamma[Seq(1,gi),,drop=FALSE]
+  nk = nk[Seq(1,k-1)]
+  mp = mp[Seq(1,k-1)]
+  vlam = vlam[Seq(1,k-1),,drop=FALSE]
   
   # If we reached the maximum number of steps
   if (k>maxsteps) {
@@ -229,7 +238,7 @@ lar <- function(x, y, maxsteps=2000, minlam=0, intercept=TRUE, normalize=TRUE,
 
   out = list(lambda=lambda,action=action,sign=s,df=df,beta=beta,
     completepath=completepath,bls=bls,
-    Gamma=Gamma,nk=nk,mp=mp,x=x,y=y,bx=bx,by=by,sx=sx,
+    Gamma=Gamma,nk=nk,vlam=vlam,mp=mp,x=x,y=y,bx=bx,by=by,sx=sx,
     intercept=intercept,normalize=normalize,call=this.call) 
   class(out) = "lar"
   return(out)
@@ -342,13 +351,12 @@ predict.lasso <- predict.lar
 # Lar inference function
 
 larInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","aic"), 
-                   gridrange=c(-100,100), gridpts=10000, mult=2, ntimes=2, verbose=FALSE) {
+                   gridrange=c(-100,100), bits=NULL, mult=2, ntimes=2, verbose=FALSE) {
   
   this.call = match.call()
   type = match.arg(type)
   checkargs.misc(sigma=sigma,alpha=alpha,k=k,
-                 gridrange=gridrange,gridpts=gridpts,
-                 mult=mult,ntimes=ntimes)
+                 gridrange=gridrange,mult=mult,ntimes=ntimes)
   if (class(obj) != "lar") stop("obj must be an object of class lar")
   if (is.null(k) && type=="active") k = length(obj$action)
   if (is.null(k) && type=="all") stop("k must be specified when type = all")
@@ -374,13 +382,13 @@ larInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","ai
     }
   }
   
-  pv.spacing = pv.asymp = pv.covtest = khat = NULL
+  pv.spacing = pv.modspac = pv.covtest = khat = NULL
   
   if (type == "active") {
     pv = vlo = vup = numeric(k) 
     vmat = matrix(0,k,n)
     ci = tailarea = matrix(0,k,2)
-    pv.spacing = pv.asymp = pv.covtest = numeric(k)
+    pv.spacing = pv.modspac = pv.covtest = numeric(k)
     sign = obj$sign[1:k]
     vars = obj$action[1:k]
 
@@ -392,7 +400,7 @@ larInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","ai
       vj = G[nk[j],]
       mj = sqrt(sum(vj^2))
       vj = vj / mj              # Standardize (divide by norm of vj)
-      a = poly.pval(y,Gj,uj,vj,sigma)
+      a = poly.pval(y,Gj,uj,vj,sigma,bits)
       pv[j] = a$pv
       sxj = sx[vars[j]]
       vlo[j] = a$vlo * mj / sxj # Unstandardize (mult by norm of vj / sxj)
@@ -400,12 +408,12 @@ larInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","ai
       vmat[j,] = vj * mj / sxj  # Unstandardize (mult by norm of vj / sxj)
     
       a = poly.int(y,Gj,uj,vj,sigma,alpha,gridrange=gridrange,
-        gridpts=gridpts,flip=(sign[j]==-1))
+        flip=(sign[j]==-1),bits=bits)
       ci[j,] = a$int * mj / sxj # Unstandardize (mult by norm of vj / sxj) 
       tailarea[j,] = a$tailarea
       
       pv.spacing[j] = spacing.pval(obj,sigma,j)
-      pv.asymp[j] = asymp.pval(obj,sigma,j)
+      pv.modspac[j] = modspac.pval(obj,sigma,j)
       pv.covtest[j] = covtest.pval(obj,sigma,j)
     }
 
@@ -446,7 +454,7 @@ larInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","ai
       Gj = rbind(G,vj)
       uj = c(u,0)
 
-      a = poly.pval(y,Gj,uj,vj,sigma)
+      a = poly.pval(y,Gj,uj,vj,sigma,bits)
       pv[j] = a$pv
       sxj = sx[vars[j]]
       vlo[j] = a$vlo * mj / sxj # Unstandardize (mult by norm of vj / sxj)
@@ -454,7 +462,7 @@ larInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","ai
       vmat[j,] = vj * mj / sxj  # Unstandardize (mult by norm of vj / sxj)
 
       a = poly.int(y,Gj,uj,vj,sigma,alpha,gridrange=gridrange,
-        gridpts=gridpts,flip=(sign[j]==-1))
+        flip=(sign[j]==-1),bits=bits)
       ci[j,] = a$int * mj / sxj # Unstandardize (mult by norm of vj / sxj)
       tailarea[j,] = a$tailarea
     }
@@ -462,7 +470,7 @@ larInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","ai
   
   out = list(type=type,k=k,khat=khat,pv=pv,ci=ci,
     tailarea=tailarea,vlo=vlo,vup=vup,vmat=vmat,y=y,
-    pv.spacing=pv.spacing,pv.asymp=pv.asymp,pv.covtest=pv.covtest,
+    pv.spacing=pv.spacing,pv.modspac=pv.modspac,pv.covtest=pv.covtest,
     vars=vars,sign=sign,sigma=sigma,alpha=alpha,
     call=this.call)
   class(out) = "larInf"
@@ -472,7 +480,7 @@ larInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","ai
 ##############################
 
 spacing.pval <- function(obj, sigma, k) {
-  v = obj$Gamma[obj$nk[k],]
+  v = obj$vlam[k,]
   sd = sigma*sqrt(sum(v^2))
   a = obj$mp[k]
   
@@ -482,14 +490,15 @@ spacing.pval <- function(obj, sigma, k) {
   return(tnorm.surv(obj$lambda[k],0,sd,a,b))
 }
 
-asymp.pval <- function(obj, sigma, k) {
-  v = obj$Gamma[obj$nk[k],]
+modspac.pval <- function(obj, sigma, k) {
+  v = obj$vlam[k,]
   sd = sigma*sqrt(sum(v^2))
 
   if (k < length(obj$action)) a = obj$lambda[k+1]
   else if (obj$completepath) a = 0
   else {
-    stop(sprintf("Asymptotic p-values at step %i require %i steps of the lar path",k,k+1))
+    warning(sprintf("Modified spacing p-values at step %i require %i steps of the lar path",k,k+1))
+    return(NA)
   }
       
   if (k==1) b = Inf
@@ -511,7 +520,8 @@ covtest.pval <- function(obj, sigma, k) {
     lam2 = 0
     sj = sign(obj$bls[j])
   } else {
-    stop(sprintf("Cov test p-values at step %i require %i steps of the lar path",k,k+1))
+    warning(sprintf("Cov test p-values at step %i require %i steps of the lar path",k,k+1))
+    return(NA)
   }
 
   x = obj$x
@@ -553,7 +563,7 @@ print.larInf <- function(x, tailarea=TRUE, ...) {
       round(x$sign*x$vmat%*%x$y/(x$sigma*sqrt(rowSums(x$vmat^2))),3),
       round(x$pv,3),round(x$ci,3),round(x$pv.spacing,3),round(x$pv.cov,3)) 
     colnames(tab) = c("Step", "Var", "Coef", "Z-score", "P-value",
-              "LowConfPt", "UpConfPt", "Spacing-pval", "CovTest-pval")
+              "LowConfPt", "UpConfPt", "Spacing", "CovTest")
     if (tailarea) {
       tab = cbind(tab,round(x$tailarea,3))
       colnames(tab)[(ncol(tab)-1):ncol(tab)] = c("LowTailArea","UpTailArea")

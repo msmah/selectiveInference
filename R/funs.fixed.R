@@ -4,7 +4,7 @@
 
 fixedLassoInf <- function(x, y, beta, lambda, intercept=TRUE, sigma=NULL, alpha=0.1,
                      type=c("partial","full"), tol.beta=1e-5, tol.kkt=0.1,
-                     gridrange=c(-100,100), gridpts=10000, verbose=FALSE) {
+                     gridrange=c(-100,100), bits=NULL, verbose=FALSE) {
   
   this.call = match.call()
   type = match.arg(type)
@@ -12,8 +12,7 @@ fixedLassoInf <- function(x, y, beta, lambda, intercept=TRUE, sigma=NULL, alpha=
   if (missing(beta) || is.null(beta)) stop("Must supply the solution beta")
   if (missing(lambda) || is.null(lambda)) stop("Must supply the tuning parameter value lambda") 
   checkargs.misc(beta=beta,lambda=lambda,sigma=sigma,alpha=alpha,
-                 gridrange=gridrange,gridpts=gridpts,
-                 tol.beta=tol.beta,tol.kkt=tol.kkt)
+                 gridrange=gridrange,tol.beta=tol.beta,tol.kkt=tol.kkt)
   n = nrow(x)
   p = ncol(x)
   beta = as.numeric(beta)
@@ -73,9 +72,11 @@ fixedLassoInf <- function(x, y, beta, lambda, intercept=TRUE, sigma=NULL, alpha=
   ci = tailarea = matrix(0,k,2)
   sign = numeric(k)
 
+  if (type=="full" & p > n)
+      warning(paste("type='full' does not make sense when p > n;",
+                    "switching to type='partial'"))
+  
   if (type=="partial" || p > n) {
-    if (p > n) warning(paste("type='full' does not make sense when p > n;",
-                             "switching to type='partial'"))
     xa = x[,vars,drop=F]
     M = pinv(crossprod(xa)) %*% t(xa)
   }
@@ -92,14 +93,14 @@ fixedLassoInf <- function(x, y, beta, lambda, intercept=TRUE, sigma=NULL, alpha=
     vj = vj / mj        # Standardize (divide by norm of vj)
     sign[j] = sign(sum(vj*y))
     vj = sign[j] * vj
-    a = poly.pval(y,G,u,vj,sigma)
+    a = poly.pval(y,G,u,vj,sigma,bits)
     pv[j] = a$pv * mj   # Unstandardize (mult by norm of vj)
     vlo[j] = a$vlo * mj # Unstandardize (mult by norm of vj)
     vup[j] = a$vup * mj # Unstandardize (mult by norm of vj)
     vmat[j,] = vj * mj  # Unstandardize (mult by norm of vj)
 
     a = poly.int(y,G,u,vj,sigma,alpha,gridrange=gridrange,
-      gridpts=gridpts,flip=(sign[j]==-1))
+      flip=(sign[j]==-1),bits=bits)
     ci[j,] = a$int * mj # Unstandardize (mult by norm of vj)
     tailarea[j,] = a$tailarea
   }
@@ -142,7 +143,8 @@ pinv <- function(A, tol=.Machine$double.eps) {
   d = Re(e$val)
   d[d > tol] = 1/d[d > tol]
   d[d < tol] = 0
-  return(v %*% diag(d) %*% t(v))
+  if (length(d)==1) return(v*d*v)
+  else return(v %*% diag(d) %*% t(v))
 }
 
 ##############################
@@ -173,3 +175,10 @@ print.fixedLassoInf <- function(x, tailarea=TRUE, ...) {
   invisible()
 }
 
+estimateLambda <- function(x, sigma, nsamp=1000){
+  n = nrow(x)
+  eps = sigma*matrix(rnorm(nsamp*n),n,nsamp)
+  lambda = 2*mean(apply(t(x)%*%eps,2,max))
+  return(lambda)
+}
+    

@@ -9,7 +9,7 @@ angle regression
 }
 \usage{
 larInf(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","aic"), 
-       gridrange=c(-100,100), gridpts=10000, mult=2, ntimes=2, verbose=FALSE) 
+       gridrange=c(-100,100), bits=NULL, mult=2, ntimes=2, verbose=FALSE) 
 }
 \arguments{
  \item{obj}{
@@ -45,9 +45,17 @@ can be specified through the \code{mult} argument (see below)
 \item{gridrange}{
 Grid range for constructing confidence intervals, on the standardized scale
 }
-\item{gridpts}{
-Number of grid points for constructing confidence intervals, within the specified
-grid range}
+\item{bits}{
+Number of bits to be used for p-value and confidence interval calculations. Default is 
+NULL, in which case standard floating point calculations are performed. When not NULL, 
+multiple precision floating point calculations are performed with the specified number 
+of bits, using the R package \code{Rmpfr}. (If this package is not installed, then the
+argument \code{bits} is silently ignored.) Note: standard double precision uses 53 bits
+so, e.g., a choice of 200 bits uses about 4 times double precision. The confidence
+interval computation is sometimes numerically challenging, and the extra precision can be 
+helpful (though computationally more costly). In particular, extra precision might be tried 
+if the values in the output columns of \code{tailarea} differ noticeably from alpha/2.
+}
 \item{mult}{Multiplier for the AIC-style penalty. Hence a value of 2 (default) 
 gives AIC, whereas a value of log(n) would give BIC}
 \item{ntimes}{Number of steps for which AIC-style criterion has to increase before 
@@ -82,7 +90,8 @@ value chosen by the modified AIC scheme}
 \item{vmat}{Linear contrasts that define the observed statistics}
 \item{y}{Vector of outcomes}
 \item{pv.spacing}{P-values from the spacing test (here M+ is used)}
-\item{pv.asymp}{P-values from the asymptotic form of the spacing test (here M+ is replaced by the last knot)}
+\item{pv.modspac}{P-values from the modified form of the spacing test 
+(here M+ is replaced by the next knot)}
 \item{pv.covtest}{P-values from covariance test}
 \item{vars}{Variables in active set}
 \item{sign}{Signs of active coefficients}
@@ -92,7 +101,7 @@ value chosen by the modified AIC scheme}
 }
 
 \references{
-Jonathan Taylor, Richard Lockhart, Ryan Tibshirani, Rob Tibshirani (2014).
+Ryan Tibshirani, Jonathan Taylor, Richard Lockhart, Rob Tibshirani (2014).
 Exact post-selection inference for sequential regression procedures. arXiv:1401.3889.
 }
 

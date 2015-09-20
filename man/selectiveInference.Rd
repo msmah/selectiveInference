@@ -5,7 +5,7 @@
 Tools for selective inference
 }
 \description{
-Functions to perform inference after selection for forward
+Functions to perform post-selection inference for forward
 stepwise regression, least angle regression, the lasso and the 
 many normal means problem
 }
@@ -13,8 +13,6 @@ many normal means problem
 \tabular{ll}{
 Package: \tab selectiveInference\cr
 Type: \tab Package\cr
-Version: \tab 1.0\cr
-Date: \tab 2015-09-01\cr
 License: \tab GPL-2\cr
 }
 
@@ -24,8 +22,26 @@ The functions compute p-values and selection intervals that properly account for
 the inherent selection carried out by the procedure. These have exact finite sample 
 type I error and coverage under Gaussian errors.
 
-This R code was developed in coordination with an analogous Python package developed 
-by Jonathan Taylor and others, see http://github.com/selective-inference/selective-inference.
+This R package was developed as part of the selective inference software project
+in Python and R:
+
+\url{https://github.com/selective-inference}
+
+Some of the R code in this work is a modification of Python code from this
+repository. Here is the current selective inference software team:
+
+Yuval Benjamini, 
+Leonard Blier, 
+Will Fithian, 
+Jason Lee, 
+Joshua Loftus,
+Stephen Reid,
+Dennis Sun,
+Yuekai Sun,
+Jonathan Taylor,
+Xiaoying Tian,
+Ryan Tibshirani,
+Rob Tibshirani
 
 The main functions included in the package are:
 \code{\link{fs}},
@@ -42,10 +58,10 @@ Maintainer: Rob Tibshirani <tibs@stanford.edu>
 }
 
 \references{
-Jonathan Taylor, Richard Lockhart, Ryan Tibshirani, Rob Tibshirani (2014).
+Ryan Tibshirani,Jonathan Taylor, Richard Lockhart, Rob Tibshirani (2014).
 Exact post-selection inference for sequential regression procedures. arXiv:1401.3889.
 
-Jason Lee, Dennis Sun, Yuekai Sun, Jonathan Taylor (2014). 
+Jason Lee, Dennis Sun, Yuekai Sun, Jonathan Taylor (2013). 
 Exact post-selection inference, with application to the lasso. arXiv:1311.6238.
 
 Stephen Reid, Jonathan Taylor, Rob Tibshirani (2014).
@@ -138,6 +154,24 @@ arXiv:1405.3340.
 #y=y-mean(y)
 
 #out=estimateSigma(x,y)
+
+##estimation of lambda  for use in fixedLassoInf
+set.seed(43)
+#n=50
+#p=10
+#sigma=.7
+#x=matrix(rnorm(n*p),n,p)
+#x=scale(x,T,F)
+#beta=c(3,2,0,0,rep(0,p-4))
+#y=x%*%beta+sigma*rnorm(n)
+#y=y-mean(y)
+#
+#estimate lambda using the  known value of sigma
+#lamhat=estimateLambda(x,sigma=.7)
+#first estimate  sigma
+#sigmahat=estimateSigma(x,y)$sigmahat
+#lamhat=estimateLambda(x,sigma=sigmahat)
+#
 
 }
 \keyword{ package }
