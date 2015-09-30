@@ -35,7 +35,7 @@ Leonard Blier,
 Will Fithian, 
 Jason Lee, 
 Joshua Loftus,
-Stephen Reid,
+Joshua Loftus, Stephen Reid,
 Dennis Sun,
 Yuekai Sun,
 Jonathan Taylor,
@@ -52,13 +52,13 @@ The main functions included in the package are:
 \code{\link{manyMeans}}
 }
 
-\author{Ryan Tibshirani, Rob Tibshirani, Jonathan Taylor, Stephen Reid
+\author{Ryan Tibshirani, Rob Tibshirani, Jonathan Taylor, Joshua Loftus, Stephen Reid
 
 Maintainer: Rob Tibshirani <tibs@stanford.edu>
 }
 
 \references{
-Ryan Tibshirani,Jonathan Taylor, Richard Lockhart, Rob Tibshirani (2014).
+Ryan Tibshirani, Jonathan Taylor, Richard Lockhart, Rob Tibshirani (2014).
 Exact post-selection inference for sequential regression procedures. arXiv:1401.3889.
 
 Jason Lee, Dennis Sun, Yuekai Sun, Jonathan Taylor (2013). 
@@ -139,6 +139,23 @@ arXiv:1405.3340.
 #mu = c(rep(signal, floor (n/5)), rep(0, n-floor(n/5))) # 20% of elements get the signal; rest 0
 #y = mu + rnorm (n, 0, 1)
 #mmObj = manyMeans(y, bh.q=0.1)
+#
+#
+# Forward stepwise with grouped variables
+#set.seed(1)
+#n <- 40
+#p <- 20
+#index <- sort(rep(1:(p/2), 2))
+#steps <- 10
+#sparsity <- 5
+#snr <- 3
+#   x <- matrix(rnorm(n*p), nrow=n)
+#      beta <- rep(0, p)
+#      beta[which(index %in% 1:sparsity)] <- snr
+#      y <-  x %*% beta+rnorm(n)
+#fit <- groupfs(x, y, index=1:p, maxsteps = steps)
+#out<- groupfsInf(fit)
+
 
 
 ##estimation of sigma for use in fsInf or larInf or fixedLassoInf

@@ -61,14 +61,14 @@ lar <- function(x, y, maxsteps=2000, minlam=0, intercept=TRUE, normalize=TRUE,
   Gamma = matrix(0,gbuf,n)
   Gamma[gi+Seq(1,p-1),] = t(s*x[,ihit]+x[,-ihit]); gi = gi+p-1
   Gamma[gi+Seq(1,p-1),] = t(s*x[,ihit]-x[,-ihit]); gi = gi+p-1
-  Gamma[gi+1,] = t(s*x[,ihit]) / sum(x[,ihit]^2); gi = gi+1
+  Gamma[gi+1,] = t(s*x[,ihit]); gi = gi+1
 
-  # nk, lambda contrast, M plus
+  # nk, regression contrast, M plus
   nk = mp = numeric(buf)
-  vlam = matrix(0,buf,n)
+  vreg = matrix(0,buf,n)
 
   nk[1] = gi
-  vlam[1,] = s*x[,ihit]
+  vreg[1,] = s*x[,ihit] / sum(x[,ihit]^2)
   if (p > 1) {
     c = t(as.numeric(Sign(t(x)%*%y)) * t(x))
     ratio = t(c[,-ihit])%*%c[,ihit]/sum(c[,ihit]^2)
@@ -110,7 +110,7 @@ lar <- function(x, y, maxsteps=2000, minlam=0, intercept=TRUE, normalize=TRUE,
       beta = cbind(beta,matrix(0,p,buf))
       nk = c(nk,numeric(buf))
       mp = c(mp,numeric(buf))
-      vlam = rbind(vlam,matrix(0,buf,n))
+      vreg = rbind(vreg,matrix(0,buf,n))
     }
 
     # Key quantities for the hitting times
@@ -151,11 +151,11 @@ lar <- function(x, y, maxsteps=2000, minlam=0, intercept=TRUE, normalize=TRUE,
     c = t(t(X2perp)/(shits-bb))
     Gamma[gi+Seq(1,p-r),] = shits*t(X2perp); gi = gi+p-r
     Gamma[gi+Seq(1,p-r-1),] = t(c[,ihit]-c[,-ihit]); gi = gi+p-r-1
-    Gamma[gi+1,] = t(shit*X2perp[,ihit]) / sum(X2perp[,ihit]^2); gi = gi+1
+    Gamma[gi+1,] = t(c[,ihit]); gi = gi+1
 
-    # nk, lambda contrast, M plus
+    # nk, regression contrast, M plus
     nk[k] = gi
-    vlam[k,] = c[,ihit]
+    vreg[k,] = shit*X2perp[,ihit] / sum(X2perp[,ihit]^2)
     if (ncol(c) > 1) {
       ratio = t(c[,-ihit])%*%c[,ihit]/sum(c[,ihit]^2)
       ip = 1-ratio > 0
@@ -194,7 +194,7 @@ lar <- function(x, y, maxsteps=2000, minlam=0, intercept=TRUE, normalize=TRUE,
   Gamma = Gamma[Seq(1,gi),,drop=FALSE]
   nk = nk[Seq(1,k-1)]
   mp = mp[Seq(1,k-1)]
-  vlam = vlam[Seq(1,k-1),,drop=FALSE]
+  vreg = vreg[Seq(1,k-1),,drop=FALSE]
   
   # If we reached the maximum number of steps
   if (k>maxsteps) {
@@ -238,7 +238,7 @@ lar <- function(x, y, maxsteps=2000, minlam=0, intercept=TRUE, normalize=TRUE,
 
   out = list(lambda=lambda,action=action,sign=s,df=df,beta=beta,
     completepath=completepath,bls=bls,
-    Gamma=Gamma,nk=nk,vlam=vlam,mp=mp,x=x,y=y,bx=bx,by=by,sx=sx,
+    Gamma=Gamma,nk=nk,vreg=vreg,mp=mp,x=x,y=y,bx=bx,by=by,sx=sx,
     intercept=intercept,normalize=normalize,call=this.call) 
   class(out) = "lar"
   return(out)
@@ -360,6 +360,10 @@ larInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","ai
   if (class(obj) != "lar") stop("obj must be an object of class lar")
   if (is.null(k) && type=="active") k = length(obj$action)
   if (is.null(k) && type=="all") stop("k must be specified when type = all")
+  if (!is.null(bits) && !requireNamespace("Rmpfr",quietly=TRUE)) {
+    warning("Package Rmpfr is not installed, reverting to standard precision")
+    bits = NULL
+  }
   
   k = min(k,length(obj$action)) # Round to last step
   x = obj$x
@@ -389,6 +393,7 @@ larInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","ai
     vmat = matrix(0,k,n)
     ci = tailarea = matrix(0,k,2)
     pv.spacing = pv.modspac = pv.covtest = numeric(k)
+    vreg = obj$vreg[1:k,,drop=FALSE]
     sign = obj$sign[1:k]
     vars = obj$action[1:k]
 
@@ -397,7 +402,7 @@ larInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","ai
       
       Gj = G[1:nk[j],]
       uj = rep(0,nk[j])
-      vj = G[nk[j],]
+      vj = vreg[j,]
       mj = sqrt(sum(vj^2))
       vj = vj / mj              # Standardize (divide by norm of vj)
       a = poly.pval(y,Gj,uj,vj,sigma,bits)
@@ -480,7 +485,7 @@ larInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","ai
 ##############################
 
 spacing.pval <- function(obj, sigma, k) {
-  v = obj$vlam[k,]
+  v = obj$Gamma[obj$nk[k],]
   sd = sigma*sqrt(sum(v^2))
   a = obj$mp[k]
   
@@ -491,7 +496,7 @@ spacing.pval <- function(obj, sigma, k) {
 }
 
 modspac.pval <- function(obj, sigma, k) {
-  v = obj$vlam[k,]
+  v = obj$Gamma[obj$nk[k],]
   sd = sigma*sqrt(sum(v^2))
 
   if (k < length(obj$action)) a = obj$lambda[k+1]

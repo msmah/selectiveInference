@@ -40,7 +40,7 @@ M-estimators with decomposable regularizers.
 Statistical Science vol. 27, p 538-557.
 }
 
-\author{Ryan Tibshirani, Rob Tibshirani, Jonathan Taylor, Stephen Reid}
+\author{Ryan Tibshirani, Rob Tibshirani, Jonathan Taylor, Joshua Loftus, Stephen Reid}
 
 \examples{
 #NOT RUN
