@@ -32,12 +32,14 @@ the interface for the \code{lar} function)
 
 \details{
 This function implements forward stepwise regression, adding the predictor at each 
-step that maximizes the absolute correlation between the predictors-- orthogonalized wrt the current model--  and the residual. This entry
+step that maximizes the absolute correlation between the predictors---once 
+orthogonalized with respect to the current model---and the residual. This entry
 criterion is standard, and is equivalent to choosing the variable that achieves 
 the biggest drop in RSS at each step; it is used, e.g., by the \code{step} function
-in R. Note that, for example,  the \code{lars} package implements a stepwise option (with type="step"), but
-uses a (mildly) different entry criterion, based on maximal absolute correlation between the original (non-orthogonalized)
-predictors and the residual. 
+in R. Note that, for example, the \code{lars} package implements a stepwise option 
+(with type="step"), but uses a (mildly) different entry criterion, based on maximal
+absolute correlation between the original (non-orthogonalized) predictors and the 
+residual. 
 }
 \value{
 \item{action}{Vector of predictors in order of entry}
@@ -68,36 +70,22 @@ to enter along the path}
 }
 
 \examples{
-#NOT RUN
-#set.seed(43)
-#n=50
-#p=10
-#sigma=.7
-#x=matrix(rnorm(n*p),n,p)
-#x=scale(x,T,F)
-#beta=c(3,2,0,0,rep(0,p-4))
-#y=x%*%beta+sigma*rnorm(n)
-#y=y-mean(y)
+set.seed(33)
+n = 50
+p = 10
+sigma = 1
+x = matrix(rnorm(n*p),n,p)
+beta = c(3,2,rep(0,p-2))
+y = x\%*\%beta + sigma*rnorm(n)
 
-#fsfit=fs(x,y)
-#
-#out=fsInf(x,y)
-#
-# states data example: predict life expectancy
-#x=state.x77[,-4]
-#y=state.x77[,4]
-#x=scale(x,T,T)
-#n=nrow(x)
-#
-#  estimate sigma from cross-validated lasso fit
-#cvf=cv.glmnet(x,y)
-#sigmahat=estimateSigma(x,y,stand=F)$sigmahat
-#
-# fit forwardStepwise
-# fsfit=fs(x,y,normalize=F)
-#
-# compute p-values and confidence intervals
-#  fsInf(fsfit,sigma=sigmahat)
+# run forward stepwise, plot results
+fsfit = fs(x,y)
+plot(fsfit)
+
+# compute sequential p-values and confidence intervals
+# (sigma estimated from full model)
+out = fsInf(fsfit)
+out
 }
 
 

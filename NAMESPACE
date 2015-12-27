@@ -8,7 +8,6 @@ export(lar,fs,
        fixedLassoInf,print.fixedLassoInf,
        forwardStop,
        estimateSigma,
-       estimateLambda,
        manyMeans,print.manyMeans,
        groupfs,groupfsInf,
        scaleGroups,factorDesign
@@ -32,7 +31,8 @@ S3method("print", "groupfsInf")
 useDynLib("selectiveInference")
 import(glmnet)
 import(intervals)
-importFrom("graphics", "abline", "axis", "matplot")
-importFrom("stats", "dnorm", "lsfit", "pexp", "pnorm", "predict",
-           "qnorm", "rnorm", "sd", "uniroot", "dchisq", "model.matrix", "pchisq")
+importFrom("graphics", abline, axis, matplot)
+importFrom("stats", dnorm, lsfit, pexp, pnorm, predict,
+           qnorm, rnorm, sd, uniroot, dchisq, model.matrix, pchisq)
+importFrom("stats", "coef", "df", "lm", "pf")
 

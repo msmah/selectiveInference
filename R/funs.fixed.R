@@ -37,6 +37,10 @@ fixedLassoInf <- function(x, y, beta, lambda, intercept=TRUE, sigma=NULL, alpha=
                   "(to within specified tolerances)"))
 
   vars = which(abs(beta) > tol.beta / sqrt(colSums(x^2)))
+  if(length(vars)==0){
+      cat("Empty model",fill=T)
+      return()
+  }
   if (any(sign(g[vars]) != sign(beta[vars])))
     warning(paste("Solution beta does not satisfy the KKT conditions",
                   "(to within specified tolerances). You might try rerunning",
@@ -99,7 +103,7 @@ fixedLassoInf <- function(x, y, beta, lambda, intercept=TRUE, sigma=NULL, alpha=
     sign[j] = sign(sum(vj*y))
     vj = sign[j] * vj
     a = poly.pval(y,G,u,vj,sigma,bits)
-    pv[j] = a$pv * mj   # Unstandardize (mult by norm of vj)
+    pv[j] = a$pv 
     vlo[j] = a$vlo * mj # Unstandardize (mult by norm of vj)
     vup[j] = a$vup * mj # Unstandardize (mult by norm of vj)
     vmat[j,] = vj * mj  # Unstandardize (mult by norm of vj)
@@ -180,15 +184,15 @@ print.fixedLassoInf <- function(x, tailarea=TRUE, ...) {
   invisible()
 }
 
-estimateLambda <- function(x, sigma, nsamp=1000){
-  checkargs.xy(x,rep(0,nrow(x)))
-  if(nsamp < 10) stop("More Monte Carlo samples required for estimation")
-  if (length(sigma)!=1) stop("sigma should be a number > 0")
-  if (sigma<=0) stop("sigma should be a number > 0")
+#estimateLambda <- function(x, sigma, nsamp=1000){
+#  checkargs.xy(x,rep(0,nrow(x)))
+#  if(nsamp < 10) stop("More Monte Carlo samples required for estimation")
+#  if (length(sigma)!=1) stop("sigma should be a number > 0")
+ # if (sigma<=0) stop("sigma should be a number > 0")
                                       
-  n = nrow(x)
-  eps = sigma*matrix(rnorm(nsamp*n),n,nsamp)
-  lambda = 2*mean(apply(t(x)%*%eps,2,max))
-  return(lambda)
-}
+ # n = nrow(x)
+ # eps = sigma*matrix(rnorm(nsamp*n),n,nsamp)
+ # lambda = 2*mean(apply(t(x)%*%eps,2,max))
+ # return(lambda)
+#}
     
