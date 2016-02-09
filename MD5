@@ -1,7 +1,7 @@
-1ba141376ecf2ea1e0c4a7d0339e4fb0 *DESCRIPTION
+ee6d171d759ad678693109305b38d743 *DESCRIPTION
 4dcb09babd1b0192bcd718908de758f7 *NAMESPACE
 682270735cc4ecd025ad1807bcfcee56 *R/funs.common.R
-4b42f54a687186f9c2a4f3cd98fa3819 *R/funs.fixed.R
+cabf4afab09a0c095b7f268d5af9d3dd *R/funs.fixed.R
 c7af51c32236ef56a6ed0a525f52dce4 *R/funs.fs.R
 fc41d0af77330bde0395f438c117c7d8 *R/funs.groupfs.R
 dfe336eb90a997a387f78564186792a3 *R/funs.inf.R
@@ -11,7 +11,7 @@ bd535e32d32e9cd0e723a5f9f00d9eef *R/funs.max.R
 857545271168d9679a9dc6f0f518abda *R/funs.quadratic.R
 d1db3866e82ad6e33baef9da4d994833 *man/estimateSigma.Rd
 1747e0899ef985469ae560fb828755cb *man/factorDesign.Rd
-322909fbc40ebe835459a23a1d0aa592 *man/fixedLassoInf.Rd
+2c2e0e7adaa13e20fb1e4081c8ebb1f3 *man/fixedLassoInf.Rd
 60e2065f446f1d6dc11c77a5534580bc *man/forwardStop.Rd
 2e6f87cd38e1f4b4cb60bfc8299dc1f4 *man/fs.Rd
 cf92ba80eac77c5a8572400aedd9e1c0 *man/fsInf.Rd
