@@ -32,7 +32,7 @@ S3method("print", "manyMeans")
 S3method("print", "groupfs")
 S3method("print", "groupfsInf")
 
-useDynLib("selectiveInference")
+useDynLib("selectiveInference",.registration=TRUE)
 import(glmnet)
 import(intervals)
 import(survival)

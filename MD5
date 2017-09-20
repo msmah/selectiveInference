@@ -1,5 +1,5 @@
-2960432e15d4af643d788787eccdf60d *DESCRIPTION
-5e91af344c2843dbaf3d93643402dfe4 *NAMESPACE
+89792835188231f03f117ab143c2fe46 *DESCRIPTION
+5b8e448cf043849e190d2b71898eaad9 *NAMESPACE
 9c5c032cb17908e6dea15a0b89d649a9 *R/funs.common.R
 cf1d1199cf6cacb1d54fce08388d20cc *R/funs.fixed.R
 faf5eed09c13d3e80270d82305f0b348 *R/funs.fixedCox.R
@@ -13,7 +13,7 @@ bd535e32d32e9cd0e723a5f9f00d9eef *R/funs.max.R
 6daca48218e58720c1570784706c199a *R/funs.quadratic.R
 d1db3866e82ad6e33baef9da4d994833 *man/estimateSigma.Rd
 1747e0899ef985469ae560fb828755cb *man/factorDesign.Rd
-ee9cb47146b8d1829a52ac5ab72f563f *man/fixedLassoInf.Rd
+1028942deac2fd45aaf2e49d94aa6dac *man/fixedLassoInf.Rd
 60e2065f446f1d6dc11c77a5534580bc *man/forwardStop.Rd
 2e6f87cd38e1f4b4cb60bfc8299dc1f4 *man/fs.Rd
 1483067f07f71b2d996138877e4f48ef *man/fsInf.Rd
@@ -31,4 +31,5 @@ b275e61a2976d14595dc9dfea646675e *man/scaleGroups.Rd
 0c21e5414145f4841c3897c995dad4c2 *man/selectiveInference-internal.Rd
 b0bbe4ffe6e958215a85bb15fc43ab01 *man/selectiveInference.Rd
 4313aa781953d7f1f6e75383e938e1c7 *src/matrixcomps.c
+d7f4c478a9de5716b2da338ae6da2ea5 *src/selinf_init.c
 11b2e6c34bc1ed181b407fc658a3b0af *src/truncnorm.c

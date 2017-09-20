@@ -155,7 +155,7 @@ gfit = glmnet(x,y,standardize=FALSE)
 # extract coef for a given lambda; note the 1/n factor!
 # (and we don't save the intercept term)
 lambda = .8
-beta = coef(gfit, s=lambda/n, exact=TRUE)[-1]
+beta = coef(gfit, s=lambda/n, exact=TRUE,x=x,y=y)[-1]
 
 # compute fixed lambda p-values and selection intervals
 out = fixedLassoInf(x,y,beta,lambda,sigma=sigma)
@@ -165,7 +165,7 @@ out
 ## as above, but use lar function instead to get initial 
 ## lasso fit (should get same results)
  lfit = lar(x,y,normalize=FALSE)
- beta = coef(lfit,s=lambda,mode="lambda")
+ beta = coef(lfit,s=lambda,mode="lambda",x=x,y=y)
  out2 = fixedLassoInf(x,y,beta,lambda,sigma=sigma)
  out2
 
@@ -189,7 +189,7 @@ gfit = glmnet(xs,y,standardize=FALSE)
 # extract coef for a given lambda; note the 1/n factor!
 # (and we don't save the intercept term)
 lambda = .8
-beta_hat = coef(gfit, s=lambda/n, exact=TRUE)[-1]
+beta_hat = coef(gfit, s=lambda/n, exact=TRUE,x=x,y=y)[-1]
 
 # compute fixed lambda p-values and selection intervals
 out = fixedLassoInf(xs,y,beta_hat,lambda,sigma=sigma)
@@ -216,7 +216,7 @@ set.seed(43)
      # extract coef for a given lambda; note the 1/n factor!
      # (and here  we DO  include the intercept term)
      lambda = .8
-     beta_hat = coef(gfit, s=lambda/n, exact=TRUE)
+     beta_hat = coef(gfit, s=lambda/n, exact=TRUE,x=x,y=y)
      
      # compute fixed lambda p-values and selection intervals
      out = fixedLassoInf(x,y,beta_hat,lambda,family="binomial")
@@ -243,7 +243,7 @@ status=sample(c(0,1),size=n,replace=TRUE)
      # extract coef for a given lambda; note the 1/n factor!
    
      lambda = 1.5
-     beta_hat = as.numeric(coef(gfit, s=lambda/n, exact=TRUE))
+     beta_hat = as.numeric(coef(gfit, s=lambda/n, exact=TRUE,x=x,y=Surv(tim,status)))
      
      # compute fixed lambda p-values and selection intervals
      out = fixedLassoInf(x,tim,beta_hat,lambda,status=status,family="cox")
