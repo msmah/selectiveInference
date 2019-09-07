@@ -1,6 +1,10 @@
-fixedCoxLassoInf=function(x,y,status,beta,lambda,alpha=.1, type=c("partial"),tol.beta=1e-5, tol.kkt=0.1,
-                     gridrange=c(-100,100), bits=NULL, verbose=FALSE,this.call=NULL){
-
+fixedCoxLassoInf=function(x, y, status,
+                          beta, lambda,
+                          alpha=.1, type=c("partial"),
+                          tol.beta=1e-5, tol.kkt=0.1,
+                          gridrange=c(-100,100), 
+                          bits=NULL, verbose=FALSE,
+                          this.call=NULL){
 
  checkargs.xy(x,y)
  if(is.null(status)) stop("Must supply `status' argument")
@@ -25,7 +29,7 @@ if( sum(status==0)+sum(status==1)!=length(y)) stop("status vector must have valu
 vars=which(m)
 if(sum(m)>0){
     bhat=beta[beta!=0] #penalized coefs just for active variables
-    s2=sign(bhat)
+    sign_bhat=sign(bhat)
 
  #check KKT
     
@@ -36,7 +40,7 @@ if(sum(m)>0){
     res=residuals(aaa,type="score")
 if(!is.matrix(res)) res=matrix(res,ncol=1)
 scor=colSums(res)
-    g=(scor+lambda*s2)/(2*lambda)
+    g=(scor+lambda*sign_bhat)/(2*lambda)
 #    cat(c(g,lambda,tol.kkt),fill=T)
      if (any(abs(g) > 1+tol.kkt) )
     warning(paste("Solution beta does not satisfy the KKT conditions",
@@ -45,9 +49,9 @@ scor=colSums(res)
 # Hessian of partial likelihood at the LASSO solution    
 MM=vcov(aaa)
 
-bbar=(bhat+lambda*MM%*%s2)
-A1=-(mydiag(s2))
-b1= -(mydiag(s2)%*%MM)%*%s2*lambda
+bbar=(bhat+lambda*MM%*%sign_bhat)
+A1=-(mydiag(sign_bhat))
+b1= -(mydiag(sign_bhat)%*%MM)%*%sign_bhat*lambda
 
    temp=max(A1%*%bbar-b1)
 
@@ -59,17 +63,17 @@ b1= -(mydiag(s2)%*%MM)%*%s2*lambda
 # the one sided p-values are a bit off
 
     for(jj in 1:length(bbar)){
-      vj=rep(0,length(bbar));vj[jj]=s2[jj]
+      vj=rep(0,length(bbar));vj[jj]=sign_bhat[jj]
 
 
-      junk=mypoly.pval.lee(bbar,A1,b1,vj,MM)
+      junk=TG.pvalue(bbar, A1, b1, vj,MM)
 
        pv[jj] = junk$pv
       vlo[jj]=junk$vlo
        vup[jj]=junk$vup
        sd[jj]=junk$sd
 
-      junk2=mypoly.int.lee(bbar,vj,vlo[jj],vup[jj],sd[jj],alpha)
+      junk2=TG.interval(bbar, A1, b1, vj, MM, alpha, flip=(sign_bhat[jj]==-1))
        ci[jj,]=junk2$int
        tailarea[jj,] = junk2$tailarea
      

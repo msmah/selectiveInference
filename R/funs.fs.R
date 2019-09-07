@@ -106,8 +106,8 @@ fs <- function(x, y, maxsteps=2000, intercept=TRUE, normalize=TRUE,
     }
 
     # Key quantities for the next entry
-    keepLs=backsolve(R,t(Q_active)%*%X_inactive)
-    X_inactive_resid = X_inactive - X_active %*% keepLs
+    keepLs = backsolve(R,t(Q_active)%*%y)
+    X_inactive_resid = X_inactive - X_active %*% backsolve(R,t(Q_active)%*%X_inactive)
     working_x = scale(X_inactive_resid,center=F,scale=sqrt(colSums(X_inactive_resid^2)))
     score = as.numeric(t(working_x)%*%y)
     
@@ -127,12 +127,13 @@ fs <- function(x, y, maxsteps=2000, intercept=TRUE, normalize=TRUE,
 
     action[k] = I[i_hit] 
     df[k] = r
-    beta[A,k] = backsolve(R,t(Q_active)%*%y)
+    beta[A,k] = keepLs
         
     # Gamma matrix!
     if (gi + 2*p > nrow(Gamma)) Gamma = rbind(Gamma,matrix(0,2*p+gbuf,n))
     working_x = t(sign_score*t(working_x))
-    Gamma[gi+Seq(1,p-r),] = t(working_x); gi = gi+p-r
+
+    Gamma[gi+Seq(1,p-r-1),] = t(working_x[,i_hit]+working_x[,-i_hit]); gi = gi+p-r-1
     Gamma[gi+Seq(1,p-r-1),] = t(working_x[,i_hit]-working_x[,-i_hit]); gi = gi+p-r-1
     Gamma[gi+1,] = t(working_x[,i_hit]); gi = gi+1
 
@@ -189,7 +190,7 @@ fs <- function(x, y, maxsteps=2000, intercept=TRUE, normalize=TRUE,
     # Record the least squares solution. Note that
     # we have already computed this
     bls = rep(0,p)
-   if(length(keepLs)>0)  bls[A] = keepLs
+    bls[A] = keepLs
   }
 
   if (verbose) cat("\n")
@@ -225,8 +226,8 @@ coef.fs <- function(object, s, ...) {
   
   if (min(s)<0 || max(s)>k) stop(sprintf("s must be between 0 and %i",k))
   knots = 1:k
-  dec = FALSE
-  return(coef.interpolate(beta,s,knots,dec))
+  decreasing = FALSE
+  return(coef.interpolate(beta,s,knots,decreasing))
 }
 
 # Prediction function for fs
@@ -234,7 +235,10 @@ coef.fs <- function(object, s, ...) {
 predict.fs <- function(object, newx, s, ...) {
   beta = coef.fs(object,s)
   if (missing(newx)) newx = scale(object$x,FALSE,1/object$sx)
-  else newx = scale(newx,object$bx,FALSE)
+  else {
+    newx = matrix(newx,ncol=ncol(object$x))
+    newx = scale(newx,object$bx,FALSE)
+  }
   return(newx %*% beta + object$by)
 }
 
@@ -291,20 +295,26 @@ fsInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","aic
     for (j in 1:k) {
       if (verbose) cat(sprintf("Inference for variable %i ...\n",vars[j]))
 
-      Gj = G[1:nconstraint[j],]
-      uj = rep(0,nconstraint[j])
+      Aj = -G[1:nconstraint[j],]
+      bj = -rep(0,nconstraint[j])
       vj = vreg[j,]
       mj = sqrt(sum(vj^2)) 
       vj = vj / mj              # Standardize (divide by norm of vj)
-      a = poly.pval(y,Gj,uj,vj,sigma,bits)
+
+      limits.info = TG.limits(y, Aj, bj, vj, Sigma=diag(rep(sigma^2, n)))
+      a = TG.pvalue.base(limits.info, bits=bits)
+
       pv[j] = a$pv
       sxj = sx[vars[j]]
       vlo[j] = a$vlo * mj / sxj # Unstandardize (mult by norm of vj / sxj)
       vup[j] = a$vup * mj / sxj # Unstandardize (mult by norm of vj / sxj)
       vmat[j,] = vj * mj / sxj  # Unstandardize (mult by norm of vj / sxj)
   
-      a = poly.int(y,Gj,uj,vj,sigma,alpha,gridrange=gridrange,
-        flip=(sign[j]==-1),bits=bits)
+      a = TG.interval.base(limits.info, 
+                           alpha=alpha,
+			   gridrange=gridrange,
+			   flip=(sign[j]==-1),
+			   bits=bits)
       ci[j,] = a$int * mj / sxj # Unstandardize (mult by norm of vj / sxj)
       tailarea[j,] = a$tailarea
     }
@@ -343,18 +353,22 @@ fsInf <- function(obj, sigma=NULL, alpha=0.1, k=NULL, type=c("active","all","aic
       vj = vj / mj              # Standardize (divide by norm of vj)
       sign[j] = sign(sum(vj*y))
       vj = sign[j] * vj
-      Gj = rbind(G,vj)
-      uj = c(u,0)
+      Aj = -rbind(G,vj)
+      bj = -c(u,0)
 
-      a = poly.pval(y,Gj,uj,vj,sigma,bits)
+      limits.info = TG.limits(y, Aj, bj, vj, Sigma=diag(rep(sigma^2, n)))
+      a = TG.pvalue.base(limits.info, bits=bits)
       pv[j] = a$pv
       sxj = sx[vars[j]]
       vlo[j] = a$vlo * mj / sxj # Unstandardize (mult by norm of vj / sxj)
       vup[j] = a$vup * mj / sxj # Unstandardize (mult by norm of vj / sxj)
       vmat[j,] = vj * mj / sxj  # Unstandardize (mult by norm of vj / sxj)
 
-      a = poly.int(y,Gj,uj,vj,sigma,alpha,gridrange=gridrange,
-        flip=(sign[j]==-1),bits=bits)
+      a = TG.interval.base(limits.info,
+                           alpha=alpha,
+                           gridrange=gridrange,
+			   flip=(sign[j]==-1),
+                           bits=bits)
       ci[j,] = a$int * mj / sxj # Unstandardize (mult by norm of vj / sxj)
       tailarea[j,] = a$tailarea
     }
