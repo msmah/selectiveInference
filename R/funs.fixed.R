@@ -247,8 +247,11 @@ fixedLassoInf <- function(x, y, beta,
     }
 	  message('vector which is offset for testing debiased betas DONE\n')
 	message(c('length of vars = ', k))
+	gc(verbose = TRUE, full = TRUE)
+	  
   for (j in 1:k) {
     if (verbose) cat(sprintf("Inference for variable %i ...\n",vars[j]))
+	  gc(verbose = TRUE, full = TRUE)
 
     vj = M[j,]
     mj = sqrt(sum(vj^2))
@@ -260,9 +263,12 @@ fixedLassoInf <- function(x, y, beta,
 
     limits.info = TG.limits(y, A, b, vj, Sigma=diag(rep(sigma^2, n)))
 	  message('TG.limits was DONE')
+	  gc(verbose = TRUE, full = TRUE)
+	  
     a = TG.pvalue.base(limits.info, null_value=null_value[j], bits=bits)
     pv[j] = a$pv
 	message('TG.pvalue.base was DONE')
+	  gc(verbose = TRUE, full = TRUE)
     
     if (is.na(sign_vars[j])) { # for variables not in the active set, report 2-sided pvalue
        pv[j] = 2 * min(pv[j], 1 - pv[j])
@@ -277,6 +283,8 @@ fixedLassoInf <- function(x, y, beta,
         vmat[j,] = vj * mj # Unstandardize (mult by norm of vj)
     }
 	  message('if/else for Unstandardizing was done')
+	  gc(verbose = TRUE, full = TRUE)
+	  
     a = TG.interval.base(limits.info, 
                          alpha=alpha,
                          gridrange=gridrange,
