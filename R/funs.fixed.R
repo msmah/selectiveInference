@@ -259,6 +259,7 @@ fixedLassoInf <- function(x, y, beta,
     }
 
     limits.info = TG.limits(y, A, b, vj, Sigma=diag(rep(sigma^2, n)))
+	  message('TG.limits was DONE')
     a = TG.pvalue.base(limits.info, null_value=null_value[j], bits=bits)
     pv[j] = a$pv
 	message('TG.pvalue.base was DONE')
