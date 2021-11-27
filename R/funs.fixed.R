@@ -261,10 +261,12 @@ fixedLassoInf <- function(x, y, beta,
     limits.info = TG.limits(y, A, b, vj, Sigma=diag(rep(sigma^2, n)))
     a = TG.pvalue.base(limits.info, null_value=null_value[j], bits=bits)
     pv[j] = a$pv
+	message('TG.pvalue.base was DONE')
     
     if (is.na(sign_vars[j])) { # for variables not in the active set, report 2-sided pvalue
        pv[j] = 2 * min(pv[j], 1 - pv[j])
     }
+	  message('for variables not in the active set, 2-sided pvalue were reported')
     
     vlo[j] = a$vlo * mj # Unstandardize (mult by norm of vj)
     vup[j] = a$vup * mj # Unstandardize (mult by norm of vj)
@@ -273,12 +275,15 @@ fixedLassoInf <- function(x, y, beta,
     } else {
         vmat[j,] = vj * mj # Unstandardize (mult by norm of vj)
     }
+	  message('if/else for Unstandardizing was done')
     a = TG.interval.base(limits.info, 
                          alpha=alpha,
                          gridrange=gridrange,
 			 flip=(sign_vars[j]==-1),
                          bits=bits)
+	  message('TG.interval.base was DONE')
     ci[j,] = (a$int-null_value[j]) * mj # Unstandardize (mult by norm of vj)
+	  message('Unstandardizing was DONE')
     tailarea[j,] = a$tailarea
   }
 
