@@ -150,8 +150,11 @@ fixedLassoInf <- function(x, y, beta,
         warning(paste(sprintf("p > n/2, and sd(y) = %0.3f used as an estimate of sigma;",sigma),
                       "you may want to use the estimateSigma function"))
       }
+	message('Estimating sigma was DONE\n')
     }
-	  message('Estimating sigma was DONE\n')
+	else
+		message('No need to estimate sigma again\n')
+	  
     
     # add additional targets for inference if provided
     if (!is.null(add.targets)) {
