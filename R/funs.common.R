@@ -134,13 +134,18 @@ checkcols <- function(A) {
 
 estimateSigma <- function(x, y, intercept=TRUE, standardize=TRUE) {
   checkargs.xy(x,rep(0,nrow(x)))
+  message('checkargs.xy DONE')
   if(nrow(x)<10) stop("Number of observations must be at least 10 to run estimateSigma")
   cvfit=cv.glmnet(x,y,intercept=intercept,standardize=standardize)
+  message('cv.glmnet  DONE')
   lamhat=cvfit$lambda.min
   fit=glmnet(x,y,standardize=standardize)
+  message('glmnet  DONE')
   yhat=predict(fit,x,s=lamhat)
+  message('yhat generated')
   nz=sum(predict(fit,s=lamhat, type="coef")!=0)
   sigma=sqrt(sum((y-yhat)^2)/(length(y)-nz-1))
+  message('estimateSigma DONE')
   return(list(sigmahat=sigma, df=nz))
 }
 
