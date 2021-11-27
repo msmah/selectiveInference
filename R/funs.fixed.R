@@ -246,7 +246,7 @@ fixedLassoInf <- function(x, y, beta,
       null_value = rep(0,k)
     }
 	  message('vector which is offset for testing debiased betas DONE\n')
-
+	message(c('length of vars = ', k))
   for (j in 1:k) {
     if (verbose) cat(sprintf("Inference for variable %i ...\n",vars[j]))
 
