@@ -7,7 +7,14 @@
 grid.search <- function(grid, fun, val1, val2, gridpts=100, griddepth=2) {
   n = length(grid)
   vals = fun(grid)
-    
+	
+   cat('mem_used (grid.search) = ')
+      message(mem_used())
+      if(mem_used() > 190000000000){
+        cat('too much memory usage (grid.search)')
+        break;
+        }
+	
   ii = which(vals >= val1)
   jj = which(vals <= val2)
   if (length(ii)==0) return(c(grid[n],Inf))   # All vals < val1
@@ -36,6 +43,12 @@ grid.bsearch <- function(left, right, fun, val, gridpts=100, griddepth=1, below=
   while (depth <= griddepth) {
     grid = seq(left,right,length=n)
     vals = fun(grid)
+	  cat('mem_used (grid.bsearch) = ')
+      message(mem_used())
+      if(mem_used() > 190000000000){
+        cat('too much memory usage (grid.bsearch)')
+        break;
+        }
     
     if (below) {
       ii = which(vals >= val)
@@ -72,6 +85,12 @@ tnorm.surv <- function(z, mean, sd, a, b, bits=NULL) {
   # Try the multi precision floating point calculation first
   o = is.finite(mean)
   mm = mean[o]
+	cat('mem_used (tnorm.surv) = ')
+      message(mem_used())
+      if(mem_used() > 190000000000){
+        cat('too much memory usage (tnorm.surv)')
+        break;
+        }
   pp = mpfr.tnorm.surv(z,mm,sd,a,b,bits) 
 
   # If there are any NAs, then settle for an approximation
@@ -91,6 +110,13 @@ mpfr.tnorm.surv <- function(z, mean=0, sd=1, a, b, bits=NULL) {
   # by the time this function is being executed, this should
   # have been properly checked at a higher level; and if Rmpfr
   # is not installed, bits would have been previously set to NULL)
+	
+	cat('mem_used (mpfr.tnorm.surv) = ')
+      message(mem_used())
+      if(mem_used() > 190000000000){
+        cat('too much memory usage (mpfr.tnorm.surv)')
+        break;
+        }
   if (!is.null(bits)) {
     z = Rmpfr::mpfr((z-mean)/sd, precBits=bits)
     a = Rmpfr::mpfr((a-mean)/sd, precBits=bits)
@@ -117,6 +143,13 @@ bryc.tnorm.surv <- function(z, mean=0, sd=1, a, b) {
   a = (a-mean)/sd
   b = (b-mean)/sd
   n = length(mean)
+	
+	cat('mem_used (bryc.tnorm.surv) = ')
+      message(mem_used())
+      if(mem_used() > 190000000000){
+        cat('too much memory usage (bryc.tnorm.surv)')
+        break;
+        }
 
   term1 = exp(z*z)
   o = a > -Inf
@@ -134,6 +167,12 @@ bryc.tnorm.surv <- function(z, mean=0, sd=1, a, b) {
 }
 
 ff <- function(z) {
+	cat('\n mem_used (ff) = ')
+      message(mem_used())
+      if(mem_used() > 190000000000){
+        cat('too much memory usage (ff)')
+        break;
+        }
   return((z^2+5.575192695*z+12.7743632)/
          (z^3*sqrt(2*pi)+14.38718147*z*z+31.53531977*z+2*12.77436324))
 }
@@ -142,6 +181,12 @@ ff <- function(z) {
 # Riemann approximation tricks, by Max G'Sell
 
 gsell.tnorm.surv <- function(z, mean=0, sd=1, a, b) {
+	cat('\n mem_used (gsell.tnorm.surv) = ')
+      message(mem_used())
+      if(mem_used() > 190000000000){
+        cat('too much memory usage (gsell.tnorm.surv)')
+        break;
+        }
   return(max.approx.frac(a/sd,b/sd,z/sd,mean/sd))
 }
 
@@ -207,6 +252,7 @@ aicStop <- function(x, y, action, df, sigma, mult=2, ntimes=2) {
 TG.limits = function(Z, A, b, eta, Sigma=NULL) {
 
     target_estimate = sum(as.numeric(eta) * as.numeric(Z))
+	message('target_estimate was calculated')
 
     if (max(A %*% as.numeric(Z) - b) > 0) {
         warning('Constraint not satisfied. A %*% Z should be elementwise less than or equal to b')
@@ -215,18 +261,42 @@ TG.limits = function(Z, A, b, eta, Sigma=NULL) {
     if (is.null(Sigma)) {
         Sigma = diag(rep(1, n))
     }
+	message('Sigma was assigned')
 
     # compute pvalues from poly lemma:  full version from Lee et al for full matrix Sigma
 
+	cat('\n mem_used (TG.limits) = ')
+      message(mem_used())
+      if(mem_used() > 190000000000){
+        cat('too much memory usage (TG.limits)')
+        break;
+        }
     n = length(Z)
     eta = matrix(eta, ncol=1, nrow=n)
     b = as.vector(b)
     var_estimate = sum(matrix(eta, nrow=1, ncol=n) %*% (Sigma %*% matrix(eta, ncol=1, nrow=n)))
     cross_cov = Sigma %*% matrix(eta, ncol=1, nrow=n)
+	message('cross_cov was computed')
+	
+	cat('\n mem_used (TG.limits) = ')
+      message(mem_used())
+      if(mem_used() > 190000000000){
+        cat('too much memory usage (TG.limits)')
+        break;
+        }
    
     resid = (diag(n) - matrix(cross_cov / var_estimate, ncol=1, nrow=n) %*% matrix(eta, nrow=1, ncol=n)) %*% Z
+	message('resid was computed')
     rho = A %*% cross_cov / var_estimate
+	message('rho was computed')
     vec = (b - as.numeric(A %*% resid)) / rho
+	
+	cat('\n mem_used (TG.limits) = ')
+      message(mem_used())
+      if(mem_used() > 190000000000){
+        cat('too much memory usage (TG.limits)')
+        break;
+        }
 
     vlo = suppressWarnings(max(vec[rho < 0]))
     vup = suppressWarnings(min(vec[rho > 0]))
@@ -238,6 +308,13 @@ TG.limits = function(Z, A, b, eta, Sigma=NULL) {
 TG.pvalue = function(Z, A, b, eta, Sigma=NULL, null_value=0, bits=NULL) {
 
     limits.info = TG.limits(Z, A, b, eta, Sigma)
+	
+	cat('\n mem_used (TG.pvalue) = ')
+      message(mem_used())
+      if(mem_used() > 190000000000){
+        cat('too much memory usage (TG.pvalue)')
+        break;
+        }
 
     return(TG.pvalue.base(limits.info, null_value=null_value, bits=bits))
 }
