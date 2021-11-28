@@ -111,6 +111,7 @@ fixedLassoInf <- function(x, y, beta,
                     "glmnet with a lower setting of the",
                     "'thresh' parameter, for a more accurate convergence."))
     }
+	remove(g)
 
     # Get lasso polyhedral region, of form Gy >= u
 
@@ -128,6 +129,7 @@ fixedLassoInf <- function(x, y, beta,
     
     A = out$A
     b = out$b
+	  remove(out)
     
     # Check polyhedral region
     tol.poly = 0.01
@@ -248,6 +250,12 @@ fixedLassoInf <- function(x, y, beta,
 	  message('vector which is offset for testing debiased betas DONE\n')
 	message(c('length of vars = ', k))
 	gc(verbose = TRUE, full = TRUE)
+	  
+	  cat('\n mem_used (TG.limits) = ')
+      	  message(mem_used())
+	  remove(x)
+	  cat('\n mem_used (TG.limits) = ')
+	  message(mem_used())
 	  
   for (j in 1:k) {
     if (verbose) cat(sprintf("Inference for variable %i ...\n",vars[j]))
