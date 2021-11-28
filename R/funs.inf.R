@@ -277,18 +277,23 @@ TG.limits = function(Z, A, b, eta, Sigma=NULL) {
     var_estimate = sum(matrix(eta, nrow=1, ncol=n) %*% (Sigma %*% matrix(eta, ncol=1, nrow=n)))
     cross_cov = Sigma %*% matrix(eta, ncol=1, nrow=n)
 	message('cross_cov was computed')
+    rho = A %*% cross_cov / var_estimate
+    message('rho was computed')
+   
+    #### I changed the order of matrix multiplication, since for large n, diag(n) would be extremely large!!!
+    #resid = (diag(n) - matrix(cross_cov / var_estimate, ncol=1, nrow=n) %*% matrix(eta, nrow=1, ncol=n)) %*% Z
+    secondterm = matrix(eta, nrow=1, ncol=n) %*% Z
+    secondterm = matrix(cross_cov / var_estimate, ncol=1, nrow=n) %*% secondterm
+    resid = Z - secondterm
+    remove(secondterm)
+	message('resid was computed')
 	
-	cat('\n mem_used (TG.limits) = ')
+    cat('\n mem_used (TG.limits) = ')
       message(mem_used())
       if(mem_used() > 190000000000){
         cat('too much memory usage (TG.limits)')
         break;
         }
-   
-    resid = (diag(n) - matrix(cross_cov / var_estimate, ncol=1, nrow=n) %*% matrix(eta, nrow=1, ncol=n)) %*% Z
-	message('resid was computed')
-    rho = A %*% cross_cov / var_estimate
-	message('rho was computed')
     vec = (b - as.numeric(A %*% resid)) / rho
 	
 	cat('\n mem_used (TG.limits) = ')
